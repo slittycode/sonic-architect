@@ -6,7 +6,7 @@ export const analyzeAudio = async (
   base64Audio: string,
   mimeType: string
 ): Promise<ReconstructionBlueprint> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
 
   const prompt = `You are a world-class Audio Engineer and Electronic Music Producer expert in Ableton Live 12.
   Analyze this audio file and deconstruct it into a "Reconstruction Blueprint".
@@ -41,7 +41,7 @@ export const analyzeAudio = async (
   }`;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-1.5-pro',
     contents: [
       {
         parts: [
@@ -58,8 +58,10 @@ export const analyzeAudio = async (
   });
 
   const text = response.text || "{}";
+  // Strip markdown code blocks if present
+  const cleanedText = text.replace(/```json\n|\n```/g, '').replace(/```/g, '');
   try {
-    return JSON.parse(text) as ReconstructionBlueprint;
+    return JSON.parse(cleanedText) as ReconstructionBlueprint;
   } catch (e) {
     console.error("Failed to parse Gemini response as JSON:", text);
     throw new Error("Could not parse analysis results. Please try again.");
