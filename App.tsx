@@ -6,7 +6,6 @@ import {
   Play, 
   Pause, 
   Music2, 
-  Activity,
   AlertCircle
 } from 'lucide-react';
 import { AnalysisStatus, ReconstructionBlueprint } from './types';
