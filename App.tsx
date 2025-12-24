@@ -73,7 +73,7 @@ const App: React.FC = () => {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600 rounded-lg shadow-lg shadow-blue-500/20">
-              <AudioLines className="w-6 h-6 text-white" />
+              <AudioLines className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-zinc-100 uppercase">Sonic Architect</h1>
@@ -83,10 +83,10 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium rounded-md transition-all border border-zinc-700"
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium rounded-md transition-all border border-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
               aria-label="Import audio stem"
             >
-              <Upload className="w-4 h-4" />
+              <Upload className="w-4 h-4" aria-hidden="true" />
               Import Stem
             </button>
             <input 
@@ -106,7 +106,7 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-zinc-800 rounded-full">
-                <Music2 className="w-5 h-5 text-blue-400" />
+                <Music2 className="w-5 h-5 text-blue-400" aria-hidden="true" />
               </div>
               <span className="text-sm font-medium text-zinc-300 mono">{fileName || 'Awaiting Input...'}</span>
             </div>
@@ -114,10 +114,10 @@ const App: React.FC = () => {
               <button 
                 onClick={togglePlayback}
                 disabled={!audioUrl}
-                className="w-12 h-12 flex items-center justify-center bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-full text-white transition-all transform active:scale-95"
+                className="w-12 h-12 flex items-center justify-center bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-full text-white transition-all transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
                 aria-label={isPlaying ? "Pause playback" : "Start playback"}
               >
-                {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-1" />}
+                {isPlaying ? <Pause className="w-6 h-6 fill-current" aria-hidden="true" /> : <Play className="w-6 h-6 fill-current ml-1" aria-hidden="true" />}
               </button>
             </div>
           </div>
@@ -135,7 +135,7 @@ const App: React.FC = () => {
 
           {status === AnalysisStatus.ANALYZING && (
             <div className="mt-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg flex items-center gap-4 animate-pulse">
-              <Activity className="w-5 h-5 text-blue-400 animate-spin" />
+              <Activity className="w-5 h-5 text-blue-400 animate-spin" aria-hidden="true" />
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-blue-200">Neural Engine Analyzing Spectrogram...</span>
                 <span className="text-xs text-blue-400/80">Identifying transients, frequency domains, and device chains...</span>
@@ -145,7 +145,7 @@ const App: React.FC = () => {
 
           {error && (
             <div className="mt-6 p-4 bg-red-900/20 border border-red-800/50 rounded-lg flex items-center gap-3 text-red-200">
-              <AlertCircle className="w-5 h-5 text-red-500" />
+              <AlertCircle className="w-5 h-5 text-red-500" aria-hidden="true" />
               <span className="text-sm">{error}</span>
             </div>
           )}
@@ -158,7 +158,7 @@ const App: React.FC = () => {
         {!blueprint && status === AnalysisStatus.IDLE && (
           <div className="flex flex-col items-center justify-center py-24 text-center space-y-6">
             <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center shadow-xl">
-              <Upload className="w-8 h-8 text-zinc-600" />
+              <Upload className="w-8 h-8 text-zinc-600" aria-hidden="true" />
             </div>
             <div className="max-w-md">
               <h2 className="text-xl font-bold text-zinc-200 mb-2">Ready to Deconstruct</h2>
@@ -166,7 +166,7 @@ const App: React.FC = () => {
             </div>
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+              className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
               aria-label="Analyze track"
             >
               Analyze Track
