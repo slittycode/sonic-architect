@@ -31,7 +31,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         {/* Telemetry */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-blue-400" />
+            <Activity className="w-4 h-4 text-blue-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Global Telemetry</h3>
           </div>
           <div className="p-5 grid grid-cols-1 gap-4">
@@ -44,7 +44,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         {/* Timeline */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-purple-400" />
+            <Clock className="w-4 h-4 text-purple-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">The Arrangement</h3>
           </div>
           <div className="p-0">
@@ -65,7 +65,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
       <div className="lg:col-span-1 space-y-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-400" />
+            <Layers className="w-4 h-4 text-emerald-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Instrumentation & Synthesis</h3>
           </div>
           <div className="p-0">
@@ -83,7 +83,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
                   </div>
                   <div className="bg-zinc-950 p-3 rounded-md border border-zinc-800 mt-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <Cpu className="w-3 h-3 text-emerald-500" />
+                      <Cpu className="w-3 h-3 text-emerald-500" aria-hidden="true" />
                       <p className="text-[10px] uppercase font-bold text-emerald-600">Ableton 12 Recommendation</p>
                     </div>
                     <p className="text-xs mono text-zinc-400 leading-tight">{inst.abletonDevice}</p>
@@ -100,7 +100,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         {/* FX Chain */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
-            <Settings2 className="w-4 h-4 text-orange-400" />
+            <Settings2 className="w-4 h-4 text-orange-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Effects Chain (The Glue)</h3>
           </div>
           <div className="p-0">
@@ -108,7 +108,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               <div key={idx} className="p-4 border-b border-zinc-800 last:border-0">
                 <div className="flex gap-3">
                   <div className="mt-1">
-                    <Zap className="w-3 h-3 text-orange-500" />
+                    <Zap className="w-3 h-3 text-orange-500" aria-hidden="true" />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-zinc-200 mb-1">{fx.artifact}</p>
@@ -126,7 +126,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         {/* Secret Sauce */}
         <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border border-indigo-500/30 rounded-xl overflow-hidden shadow-xl">
           <div className="px-4 py-3 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-yellow-400" />
+            <Sparkles className="w-4 h-4 text-yellow-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300">The Secret Sauce</h3>
           </div>
           <div className="p-6">
