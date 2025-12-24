@@ -6,7 +6,8 @@ import {
   Play, 
   Pause, 
   Music2, 
-  AlertCircle
+  AlertCircle,
+  Activity
 } from 'lucide-react';
 import { AnalysisStatus, ReconstructionBlueprint } from './types';
 import BlueprintDisplay from './components/BlueprintDisplay';
@@ -25,11 +26,32 @@ const App: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Security: Reset error state
     setError(null);
+
+    // Security: Input Validation
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`File size exceeds limit (${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB). Please upload a smaller stem.`);
+      return;
+    }
+
+    // Security: Type Validation
+    // Note: mime type check is not foolproof but a good first line of defense
+    // We allow anything starting with audio/ OR if the extension looks like audio (fallback for some OS/browser combos)
+    const isAudioType = file.type.startsWith('audio/');
+    // Very basic extension check as fallback if type is empty or generic
+    const isAudioExtension = /\.(mp3|wav|ogg|aac|m4a|flac)$/i.test(file.name);
+
+    if (!isAudioType && !isAudioExtension) {
+       setError("Invalid file type. Please upload an audio file.");
+       return;
+    }
+
     setFileName(file.name);
     const url = URL.createObjectURL(file);
     setAudioUrl(url);
