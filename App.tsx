@@ -9,9 +9,10 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { AnalysisStatus, ReconstructionBlueprint } from './types';
-import { analyzeAudio } from './services/geminiService';
-import WaveformVisualizer from './components/WaveformVisualizer';
 import BlueprintDisplay from './components/BlueprintDisplay';
+import WaveformSkeleton from './components/WaveformSkeleton';
+
+const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AnalysisStatus>(AnalysisStatus.IDLE);
@@ -43,6 +44,8 @@ const App: React.FC = () => {
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = (reader.result as string).split(',')[1];
+        // Dynamic import to split @google/genai from main bundle
+        const { analyzeAudio } = await import('./services/geminiService');
         const result = await analyzeAudio(base64, file.type);
         setBlueprint(result);
         setStatus(AnalysisStatus.COMPLETED);
@@ -122,7 +125,9 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          <WaveformVisualizer audioUrl={audioUrl} isPlaying={isPlaying} />
+          <React.Suspense fallback={<WaveformSkeleton />}>
+            <WaveformVisualizer audioUrl={audioUrl} isPlaying={isPlaying} />
+          </React.Suspense>
           
           {audioUrl && (
             <audio 
