@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   AudioLines, 
   Upload, 
@@ -91,6 +91,23 @@ const App: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        const target = event.target as HTMLElement;
+        if (target.matches('input, textarea, button, a, [role="button"]')) return;
+
+        event.preventDefault();
+        if (audioUrl) {
+            togglePlayback();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlayback, audioUrl]);
+
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center pb-20">
       {/* Header */}
@@ -139,8 +156,10 @@ const App: React.FC = () => {
               <button 
                 onClick={togglePlayback}
                 disabled={!audioUrl}
-                className="w-12 h-12 flex items-center justify-center bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-full text-white transition-all transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
+                className="w-12 h-12 flex items-center justify-center bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-full text-white transition-all transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none group relative"
                 aria-label={isPlaying ? "Pause playback" : "Start playback"}
+                aria-keyshortcuts="Space"
+                title={isPlaying ? "Pause (Space)" : "Play (Space)"}
               >
                 {isPlaying ? <Pause className="w-6 h-6 fill-current" aria-hidden="true" /> : <Play className="w-6 h-6 fill-current ml-1" aria-hidden="true" />}
               </button>
