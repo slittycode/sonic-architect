@@ -60,15 +60,19 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = React.memo(({ audi
     const height = 120;
 
     // Animate bars to random heights to simulate visualization
+    // Optimization: Use data binding + single transition call instead of .each() loop
+    // This reduces object creation overhead and leverages D3's batched DOM updates.
     const interval = setInterval(() => {
-         svg.selectAll('rect').each(function() {
-            const rect = d3.select(this);
-            const newHeight = Math.random() * height;
-            rect.transition()
-                .duration(200)
-                .attr('height', newHeight)
-                .attr('y', (height - newHeight) / 2);
-         });
+         const rects = svg.selectAll('rect');
+         const count = rects.size();
+         const newData = Array.from({ length: count }, () => Math.random() * height);
+
+         rects.data(newData)
+            .transition()
+            .duration(200)
+            .ease(d3.easeLinear)
+            .attr('height', d => d)
+            .attr('y', d => (height - d) / 2);
     }, 200);
 
     return () => clearInterval(interval);
