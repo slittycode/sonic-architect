@@ -56,13 +56,21 @@ export enum AnalysisStatus {
 }
 
 // Provider types
-export type ProviderType = 'local' | 'ollama' | 'gemini';
+export type ProviderType = 'local' | 'ollama' | 'openai' | 'bedrock' | 'gemini';
 
 export interface AnalysisProvider {
   name: string;
   type: ProviderType;
   analyze(file: File): Promise<ReconstructionBlueprint>;
   isAvailable(): Promise<boolean>;
+}
+
+// Provider credential configuration (stored in localStorage)
+export interface ProviderCredentials {
+  ollama?: { baseUrl: string; model: string };
+  openai?: { apiKey: string; model: string; baseUrl: string };
+  bedrock?: { accessKeyId: string; secretAccessKey: string; region: string; modelId: string };
+  gemini?: { apiKey: string };
 }
 
 // Audio feature extraction types

@@ -9,15 +9,12 @@ import {
   AlertCircle,
   Activity,
   Settings,
-  Cpu,
-  Cloud,
-  Brain,
 } from 'lucide-react';
-import { AnalysisStatus, AnalysisProvider, ProviderType, ReconstructionBlueprint } from './types';
+import { AnalysisStatus, AnalysisProvider, ProviderType, ProviderCredentials, ReconstructionBlueprint } from './types';
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
 import { LocalAnalysisProvider } from './services/localProvider';
-import { isOllamaAvailable } from './services/ollamaClient';
+import { ProviderSettings, getEffectiveCredentials, saveCredentials } from './components/ProviderSettings';
 
 const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
 
@@ -27,7 +24,7 @@ const localProvider = new LocalAnalysisProvider();
 function getStoredProvider(): ProviderType {
   try {
     const stored = localStorage.getItem('sonic-architect-provider');
-    if (stored === 'gemini' || stored === 'local' || stored === 'ollama') return stored;
+    if (stored === 'gemini' || stored === 'local' || stored === 'ollama' || stored === 'openai' || stored === 'bedrock') return stored;
   } catch {}
   return 'local';
 }
@@ -42,20 +39,13 @@ const App: React.FC = () => {
   const [providerType, setProviderType] = useState<ProviderType>(getStoredProvider);
   const [showSettings, setShowSettings] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
-  const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
+  const [credentials, setCredentials] = useState<ProviderCredentials>(getEffectiveCredentials);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB (local analysis can handle larger files)
+  const MAX_FILE_SIZE = 100 * 1024 * 1024;
   const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
-
-  // Check Ollama availability when settings panel opens
-  useEffect(() => {
-    if (showSettings) {
-      isOllamaAvailable().then(setOllamaOnline).catch(() => setOllamaOnline(false));
-    }
-  }, [showSettings]);
 
   const handleProviderChange = (type: ProviderType) => {
     setProviderType(type);
@@ -64,20 +54,53 @@ const App: React.FC = () => {
   };
 
   const getActiveProvider = useCallback(async (): Promise<AnalysisProvider> => {
+    const creds = credentials;
+
+    if (providerType === 'openai') {
+      const { OpenAIProvider } = await import('./services/openaiProvider');
+      const provider = new OpenAIProvider({
+        apiKey: creds.openai?.apiKey || '',
+        model: creds.openai?.model || 'gpt-4o-mini',
+        baseUrl: creds.openai?.baseUrl || 'https://api.openai.com/v1',
+        temperature: 0.3,
+      });
+      if (await provider.isAvailable()) return provider;
+      console.warn('OpenAI not available. Falling back to local analysis.');
+    }
+
+    if (providerType === 'bedrock') {
+      const { BedrockProvider } = await import('./services/bedrockProvider');
+      const provider = new BedrockProvider({
+        accessKeyId: creds.bedrock?.accessKeyId || '',
+        secretAccessKey: creds.bedrock?.secretAccessKey || '',
+        region: creds.bedrock?.region || 'us-east-1',
+        modelId: creds.bedrock?.modelId || 'anthropic.claude-3-haiku-20240307-v1:0',
+        temperature: 0.3,
+      });
+      if (await provider.isAvailable()) return provider;
+      console.warn('Bedrock not available. Falling back to local analysis.');
+    }
+
     if (providerType === 'ollama') {
       const { OllamaProvider } = await import('./services/ollamaProvider');
-      const ollama = new OllamaProvider();
+      const ollama = new OllamaProvider({
+        baseUrl: creds.ollama?.baseUrl || 'http://localhost:11434',
+        model: creds.ollama?.model || 'llama3.2',
+        temperature: 0.3,
+      });
       if (await ollama.isAvailable()) return ollama;
       console.warn('Ollama not reachable. Falling back to local analysis.');
     }
+
     if (providerType === 'gemini') {
       const { GeminiProvider } = await import('./services/geminiService');
       const gemini = new GeminiProvider();
       if (await gemini.isAvailable()) return gemini;
       console.warn('Gemini API key not found. Falling back to local analysis.');
     }
+
     return localProvider;
-  }, [providerType]);
+  }, [providerType, credentials]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -164,7 +187,14 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlayback, audioUrl]);
 
-  const providerLabel = providerType === 'gemini' ? 'Gemini 1.5 Pro' : providerType === 'ollama' ? 'Ollama LLM' : 'Local DSP Engine';
+  const PROVIDER_LABELS: Record<ProviderType, string> = {
+    local: 'Local DSP Engine',
+    ollama: 'Ollama LLM',
+    openai: 'OpenAI (ChatGPT)',
+    bedrock: 'AWS Bedrock',
+    gemini: 'Gemini 1.5 Pro',
+  };
+  const providerLabel = PROVIDER_LABELS[providerType];
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center pb-20">
@@ -193,45 +223,17 @@ const App: React.FC = () => {
                 <span className="hidden sm:inline">{providerLabel}</span>
               </button>
               {showSettings && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-zinc-800">
-                    <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Analysis Engine</p>
-                  </div>
-                  <button
-                    onClick={() => handleProviderChange('local')}
-                    className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'local' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
-                  >
-                    <Cpu className="w-4 h-4 text-emerald-400 flex-shrink-0" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Local DSP Engine</p>
-                      <p className="text-[10px] text-zinc-500">Client-side analysis. No API key needed. Works offline.</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleProviderChange('gemini')}
-                    className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'gemini' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
-                  >
-                    <Cloud className="w-4 h-4 text-blue-400 flex-shrink-0" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Gemini 1.5 Pro</p>
-                      <p className="text-[10px] text-zinc-500">Cloud AI analysis. Requires API key in .env.local.</p>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleProviderChange('ollama')}
-                    className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'ollama' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
-                  >
-                    <Brain className="w-4 h-4 text-purple-400 flex-shrink-0" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Ollama LLM</p>
-                      <p className="text-[10px] text-zinc-500">
-                        Local DSP + LLM descriptions. Requires Ollama running.
-                        {ollamaOnline === true && <span className="ml-1 text-emerald-400">● Online</span>}
-                        {ollamaOnline === false && <span className="ml-1 text-red-400">● Offline</span>}
-                      </p>
-                    </div>
-                  </button>
-                </div>
+                <ProviderSettings
+                  providerType={providerType}
+                  onProviderChange={(type) => {
+                    handleProviderChange(type);
+                  }}
+                  credentials={credentials}
+                  onCredentialsChange={(creds) => {
+                    setCredentials(creds);
+                    saveCredentials(creds);
+                  }}
+                />
               )}
             </div>
 
@@ -297,18 +299,14 @@ const App: React.FC = () => {
               <Activity className="w-5 h-5 text-blue-400 animate-spin" aria-hidden="true" />
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-blue-200">
-                  {providerType === 'ollama'
-                    ? 'Analyzing Audio & Querying LLM...'
-                    : providerType === 'local'
-                      ? 'Analyzing Audio Spectrogram...'
-                      : 'Neural Engine Analyzing Spectrogram...'}
+                  {providerType === 'local'
+                    ? 'Analyzing Audio Spectrogram...'
+                    : `Analyzing Audio & Querying ${PROVIDER_LABELS[providerType]}...`}
                 </span>
                 <span className="text-xs text-blue-400/80">
-                  {providerType === 'ollama'
-                    ? 'Phase 1: DSP feature extraction. Phase 2: LLM enhancement via Ollama...'
-                    : providerType === 'local'
-                      ? 'Extracting BPM, key, spectral features, and onset data...'
-                      : 'Identifying transients, frequency domains, and device chains...'}
+                  {providerType === 'local'
+                    ? 'Extracting BPM, key, spectral features, and onset data...'
+                    : 'Phase 1: DSP feature extraction. Phase 2: LLM-enhanced descriptions...'}
                 </span>
               </div>
             </div>
@@ -351,7 +349,7 @@ const App: React.FC = () => {
             {/* Analysis metadata bar */}
             {blueprint.meta && (
               <div className="flex items-center gap-4 text-[10px] mono text-zinc-500 uppercase tracking-widest px-1">
-                <span>Engine: {blueprint.meta.provider === 'local' ? 'Local DSP' : blueprint.meta.provider === 'ollama' ? 'Ollama LLM' : 'Gemini 1.5 Pro'}</span>
+                <span>Engine: {PROVIDER_LABELS[blueprint.meta.provider as ProviderType] ?? blueprint.meta.provider}</span>
                 <span className="text-zinc-700">|</span>
                 <span>Analyzed in {blueprint.meta.analysisTime}ms</span>
                 {blueprint.meta.sampleRate > 0 && (
@@ -395,9 +393,7 @@ const App: React.FC = () => {
                 Upload an audio file to generate a complete Ableton Live 12 reconstruction blueprint.
                 {providerType === 'local'
                   ? ' Analysis runs locally in your browser — no API key needed.'
-                  : providerType === 'ollama'
-                    ? ' Local DSP analysis enhanced with Ollama LLM descriptions. Requires Ollama running.'
-                    : ' Our neural engine will map out every device and signal path.'}
+                  : ` Local DSP analysis enhanced with ${PROVIDER_LABELS[providerType]} descriptions.`}
               </p>
             </div>
             <button 
