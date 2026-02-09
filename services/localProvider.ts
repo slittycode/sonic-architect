@@ -8,6 +8,7 @@
 
 import {
   AnalysisProvider,
+  AudioFeatures,
   ReconstructionBlueprint,
   ArrangementSection,
 } from '../types';
@@ -191,6 +192,41 @@ function describeGroove(features: { onsetDensity: number; bpm: number; crestFact
   return groove;
 }
 
+export function buildLocalBlueprint(
+  features: AudioFeatures,
+  analysisTime: number,
+  provider: 'local' | 'ollama' = 'local',
+): ReconstructionBlueprint {
+  const arrangement = detectArrangement(features.rmsProfile, features.duration);
+  const instrumentation = getInstrumentRecommendations(features.spectralBands);
+  const fxChain = getFXRecommendations(features);
+  const secretSauce = getSecretSauce(features);
+
+  return {
+    telemetry: {
+      bpm: `${features.bpm}`,
+      key: `${features.key.root} ${features.key.scale}`,
+      groove: describeGroove(features),
+      bpmConfidence: features.bpmConfidence,
+      keyConfidence: features.key.confidence,
+    },
+    arrangement,
+    instrumentation,
+    fxChain: fxChain.length > 0 ? fxChain : [{
+      artifact: 'Balanced dynamics and spectrum',
+      recommendation: 'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
+    }],
+    secretSauce,
+    meta: {
+      provider,
+      analysisTime,
+      sampleRate: features.sampleRate,
+      duration: features.duration,
+      channels: features.channels,
+    },
+  };
+}
+
 export class LocalAnalysisProvider implements AnalysisProvider {
   name = 'Local DSP Engine';
   type = 'local' as const;
@@ -201,44 +237,16 @@ export class LocalAnalysisProvider implements AnalysisProvider {
   }
 
   async analyze(file: File): Promise<ReconstructionBlueprint> {
-    const startTime = performance.now();
-
-    // Decode audio
     const audioBuffer = await decodeAudioFile(file);
+    return this.analyzeAudioBuffer(audioBuffer);
+  }
+
+  async analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<ReconstructionBlueprint> {
+    const startTime = performance.now();
 
     // Extract features
     const features = extractAudioFeatures(audioBuffer);
-
-    // Build blueprint from features
-    const arrangement = detectArrangement(features.rmsProfile, features.duration);
-    const instrumentation = getInstrumentRecommendations(features.spectralBands);
-    const fxChain = getFXRecommendations(features);
-    const secretSauce = getSecretSauce(features);
-
     const analysisTime = Math.round(performance.now() - startTime);
-
-    return {
-      telemetry: {
-        bpm: `${features.bpm}`,
-        key: `${features.key.root} ${features.key.scale}`,
-        groove: describeGroove(features),
-        bpmConfidence: features.bpmConfidence,
-        keyConfidence: features.key.confidence,
-      },
-      arrangement,
-      instrumentation,
-      fxChain: fxChain.length > 0 ? fxChain : [{
-        artifact: 'Balanced dynamics and spectrum',
-        recommendation: 'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
-      }],
-      secretSauce,
-      meta: {
-        provider: 'local',
-        analysisTime,
-        sampleRate: features.sampleRate,
-        duration: features.duration,
-        channels: features.channels,
-      },
-    };
+    return buildLocalBlueprint(features, analysisTime, 'local');
   }
 }

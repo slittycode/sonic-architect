@@ -17,18 +17,20 @@ import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
 import SessionMusician from './components/SessionMusician';
 import { LocalAnalysisProvider } from './services/localProvider';
-import { decodeAudioFile } from './services/audioAnalysis';
+import { OllamaProvider } from './services/ollamaProvider';
+import { decodeAudioFile, extractWaveformPeaks } from './services/audioAnalysis';
 import { detectPitches } from './services/pitchDetection';
 
 const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
 
 // Initialize providers
 const localProvider = new LocalAnalysisProvider();
+const ollamaProvider = new OllamaProvider(localProvider);
 
 function getStoredProvider(): ProviderType {
   try {
     const stored = localStorage.getItem('sonic-architect-provider');
-    if (stored === 'gemini' || stored === 'local') return stored;
+    if (stored === 'gemini' || stored === 'local' || stored === 'ollama') return stored;
   } catch {}
   return 'local';
 }
@@ -43,6 +45,10 @@ const App: React.FC = () => {
   const [providerType, setProviderType] = useState<ProviderType>(getStoredProvider);
   const [showSettings, setShowSettings] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
+  const [providerNotice, setProviderNotice] = useState<string | null>(null);
+  const [waveformPeaks, setWaveformPeaks] = useState<number[] | null>(null);
+  const [waveformDuration, setWaveformDuration] = useState(0);
+  const [playbackProgress, setPlaybackProgress] = useState(0);
 
   // Session Musician state
   const [midiResult, setMidiResult] = useState<PitchDetectionResult | null>(null);
@@ -51,25 +57,52 @@ const App: React.FC = () => {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB (local analysis can handle larger files)
   const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
 
+  const replaceAudioUrl = useCallback((nextUrl: string | null) => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+    }
+    objectUrlRef.current = nextUrl;
+    setAudioUrl(nextUrl);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    };
+  }, []);
+
   const handleProviderChange = (type: ProviderType) => {
     setProviderType(type);
+    setProviderNotice(null);
     try { localStorage.setItem('sonic-architect-provider', type); } catch {}
     setShowSettings(false);
   };
 
   const getActiveProvider = useCallback(async (): Promise<AnalysisProvider> => {
+    setProviderNotice(null);
+
+    if (providerType === 'ollama') {
+      if (await ollamaProvider.isAvailable()) return ollamaProvider;
+      setProviderNotice('Ollama not detected. Using Local DSP Engine. Start Ollama with `ollama serve`.');
+      return localProvider;
+    }
+
     if (providerType === 'gemini') {
       // Lazy load Gemini provider only when selected
       const { GeminiProvider } = await import('./services/geminiService');
       const gemini = new GeminiProvider();
       if (await gemini.isAvailable()) return gemini;
       // Fallback to local if Gemini API key is missing
-      console.warn('Gemini API key not found. Falling back to local analysis.');
+      setProviderNotice('Gemini API key not found. Using Local DSP Engine.');
     }
+
     return localProvider;
   }, [providerType]);
 
@@ -98,8 +131,11 @@ const App: React.FC = () => {
 
     setFileName(file.name);
     setLastFile(file);
+    setPlaybackProgress(0);
+    setWaveformPeaks(null);
+    setWaveformDuration(0);
     const url = URL.createObjectURL(file);
-    setAudioUrl(url);
+    replaceAudioUrl(url);
 
     await triggerAnalysis(file);
   };
@@ -110,12 +146,32 @@ const App: React.FC = () => {
     setMidiResult(null);
     setMidiError(null);
 
+    let decodedBuffer: AudioBuffer | null = null;
+    try {
+      decodedBuffer = await decodeAudioFile(file);
+      setWaveformPeaks(extractWaveformPeaks(decodedBuffer));
+      setWaveformDuration(decodedBuffer.duration);
+    } catch (decodeError: any) {
+      if (providerType !== 'gemini') {
+        setStatus(AnalysisStatus.ERROR);
+        setError(decodeError?.message || 'Could not decode audio for local analysis.');
+        return;
+      }
+      setWaveformPeaks(null);
+      setWaveformDuration(0);
+      setMidiError('Local decode failed. Session Musician is unavailable for this file.');
+    }
+
     // Run blueprint analysis and pitch detection concurrently
-    // They share the decoded AudioBuffer from decodeAudioFile
     const blueprintPromise = (async () => {
       try {
         const provider = await getActiveProvider();
-        const result = await provider.analyze(file);
+        const maybeBufferProvider = provider as AnalysisProvider & {
+          analyzeAudioBuffer?: (audioBuffer: AudioBuffer) => Promise<ReconstructionBlueprint>;
+        };
+        const result = decodedBuffer && typeof maybeBufferProvider.analyzeAudioBuffer === 'function'
+          ? await maybeBufferProvider.analyzeAudioBuffer(decodedBuffer)
+          : await provider.analyze(file);
         setBlueprint(result);
         setStatus(AnalysisStatus.COMPLETED);
         return result;
@@ -128,13 +184,13 @@ const App: React.FC = () => {
     })();
 
     const pitchPromise = (async () => {
+      if (!decodedBuffer) return;
       try {
         setMidiDetecting(true);
-        const audioBuffer = await decodeAudioFile(file);
         // Use BPM from blueprint if available, otherwise default
         const bpResult = await blueprintPromise;
         const bpm = bpResult?.telemetry?.bpm ? parseFloat(bpResult.telemetry.bpm) || 120 : 120;
-        const pitchResult = await detectPitches(audioBuffer, bpm);
+        const pitchResult = await detectPitches(decodedBuffer, bpm);
         setMidiResult(pitchResult);
       } catch (err: any) {
         console.error('Pitch detection error:', err);
@@ -150,11 +206,15 @@ const App: React.FC = () => {
   const resetAll = () => {
     setStatus(AnalysisStatus.IDLE);
     setBlueprint(null);
-    setAudioUrl(null);
+    replaceAudioUrl(null);
     setIsPlaying(false);
     setError(null);
     setFileName(null);
     setLastFile(null);
+    setProviderNotice(null);
+    setWaveformPeaks(null);
+    setWaveformDuration(0);
+    setPlaybackProgress(0);
     setMidiResult(null);
     setMidiDetecting(false);
     setMidiError(null);
@@ -165,10 +225,13 @@ const App: React.FC = () => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        audioRef.current
+          .play()
+          .then(() => setIsPlaying(true))
+          .catch(() => setError('Unable to start playback.'));
       }
-      setIsPlaying(!isPlaying);
     }
   }, [isPlaying]);
 
@@ -189,7 +252,12 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlayback, audioUrl]);
 
-  const providerLabel = providerType === 'gemini' ? 'Gemini 1.5 Pro' : 'Local DSP Engine';
+  const providerLabel =
+    providerType === 'gemini'
+      ? 'Gemini 1.5 Pro'
+      : providerType === 'ollama'
+        ? 'Ollama + Local DSP'
+        : 'Local DSP Engine';
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center pb-20">
@@ -242,6 +310,16 @@ const App: React.FC = () => {
                       <p className="text-[10px] text-zinc-500">Cloud AI analysis. Requires API key in .env.local.</p>
                     </div>
                   </button>
+                  <button
+                    onClick={() => handleProviderChange('ollama')}
+                    className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'ollama' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
+                  >
+                    <Activity className="w-4 h-4 text-violet-400 flex-shrink-0" aria-hidden="true" />
+                    <div>
+                      <p className="text-sm font-medium text-zinc-200">Ollama + Local DSP</p>
+                      <p className="text-[10px] text-zinc-500">Local analysis with optional local-LLM enhancement.</p>
+                    </div>
+                  </button>
                 </div>
               )}
             </div>
@@ -291,14 +369,33 @@ const App: React.FC = () => {
           </div>
           
           <React.Suspense fallback={<WaveformSkeleton />}>
-            <WaveformVisualizer audioUrl={audioUrl} isPlaying={isPlaying} />
+            <WaveformVisualizer
+              audioUrl={audioUrl}
+              peaks={waveformPeaks}
+              duration={waveformDuration}
+              playbackProgress={playbackProgress}
+              onSeek={(time) => {
+                if (!audioRef.current || !Number.isFinite(time)) return;
+                audioRef.current.currentTime = time;
+                const duration = audioRef.current.duration || waveformDuration;
+                if (duration > 0) setPlaybackProgress(time / duration);
+              }}
+            />
           </React.Suspense>
           
           {audioUrl && (
             <audio 
               ref={audioRef} 
               src={audioUrl} 
-              onEnded={() => setIsPlaying(false)}
+              onTimeUpdate={() => {
+                const node = audioRef.current;
+                if (!node || !node.duration) return;
+                setPlaybackProgress(node.currentTime / node.duration);
+              }}
+              onEnded={() => {
+                setIsPlaying(false);
+                setPlaybackProgress(1);
+              }}
               className="hidden"
             />
           )}
@@ -308,14 +405,26 @@ const App: React.FC = () => {
               <Activity className="w-5 h-5 text-blue-400 animate-spin" aria-hidden="true" />
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-blue-200">
-                  {providerType === 'local' ? 'Analyzing Audio Spectrogram...' : 'Neural Engine Analyzing Spectrogram...'}
+                  {providerType === 'gemini'
+                    ? 'Neural Engine Analyzing Spectrogram...'
+                    : providerType === 'ollama'
+                      ? 'Analyzing Audio + Preparing Ollama Enhancement...'
+                      : 'Analyzing Audio Spectrogram...'}
                 </span>
                 <span className="text-xs text-blue-400/80">
-                  {providerType === 'local'
-                    ? 'Extracting BPM, key, spectral features, and onset data...'
-                    : 'Identifying transients, frequency domains, and device chains...'}
+                  {providerType === 'gemini'
+                    ? 'Identifying transients, frequency domains, and device chains...'
+                    : providerType === 'ollama'
+                      ? 'Running local DSP first, then enriching descriptions with Ollama...'
+                      : 'Extracting BPM, key, spectral features, and onset data...'}
                 </span>
               </div>
+            </div>
+          )}
+
+          {providerNotice && (
+            <div className="mt-4 p-3 bg-amber-900/20 border border-amber-700/50 rounded text-xs text-amber-200">
+              {providerNotice}
             </div>
           )}
 
@@ -356,7 +465,13 @@ const App: React.FC = () => {
             {/* Analysis metadata bar */}
             {blueprint.meta && (
               <div className="flex items-center gap-4 text-[10px] mono text-zinc-500 uppercase tracking-widest px-1">
-                <span>Engine: {blueprint.meta.provider === 'local' ? 'Local DSP' : 'Gemini 1.5 Pro'}</span>
+                <span>
+                  Engine: {blueprint.meta.provider === 'local'
+                    ? 'Local DSP'
+                    : blueprint.meta.provider === 'ollama'
+                      ? 'Ollama + Local DSP'
+                      : 'Gemini 1.5 Pro'}
+                </span>
                 <span className="text-zinc-700">|</span>
                 <span>Analyzed in {blueprint.meta.analysisTime}ms</span>
                 {blueprint.meta.sampleRate > 0 && (
@@ -408,9 +523,11 @@ const App: React.FC = () => {
               <h2 className="text-xl font-bold text-zinc-200 mb-2">Ready to Deconstruct</h2>
               <p className="text-zinc-500 text-sm">
                 Upload an audio file to generate a complete Ableton Live 12 reconstruction blueprint.
-                {providerType === 'local'
-                  ? ' Analysis runs locally in your browser — no API key needed.'
-                  : ' Our neural engine will map out every device and signal path.'}
+                {providerType === 'gemini'
+                  ? ' Our neural engine will map out every device and signal path.'
+                  : providerType === 'ollama'
+                    ? ' Core analysis runs locally; Ollama enhances the descriptive output when available.'
+                    : ' Analysis runs locally in your browser — no API key needed.'}
               </p>
             </div>
             <button 

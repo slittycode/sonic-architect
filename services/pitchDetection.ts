@@ -41,6 +41,13 @@ const PITCH_CHANGE_THRESHOLD = 0.5;
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 
+export function getFrameDurationSeconds(sampleRate: number): number {
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
+    throw new Error('sampleRate must be a positive number');
+  }
+  return HOP_SIZE / sampleRate;
+}
+
 function frequencyToMidi(freq: number): number {
   return 69 + 12 * Math.log2(freq / 440);
 }
@@ -168,7 +175,11 @@ function detectFrames(audioBuffer: AudioBuffer): RawDetection[] {
  * Group consecutive frame detections into discrete notes.
  * Adjacent frames at (approximately) the same pitch are merged.
  */
-function segmentNotes(detections: RawDetection[], maxRms: number): DetectedNote[] {
+function segmentNotes(
+  detections: RawDetection[],
+  maxRms: number,
+  sampleRate: number,
+): DetectedNote[] {
   if (detections.length === 0) return [];
 
   const notes: DetectedNote[] = [];
@@ -193,7 +204,7 @@ function segmentNotes(detections: RawDetection[], maxRms: number): DetectedNote[
       frameCount++;
     } else {
       // Finalize previous note
-      const duration = noteEnd.time - noteStart.time + (HOP_SIZE / 44100);
+      const duration = noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
       if (duration >= MIN_NOTE_DURATION) {
         const roundedMidi = Math.round(
           (detections.slice(
@@ -222,7 +233,7 @@ function segmentNotes(detections: RawDetection[], maxRms: number): DetectedNote[
   }
 
   // Finalize last note
-  const duration = noteEnd.time - noteStart.time + (HOP_SIZE / 44100);
+  const duration = noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
   if (duration >= MIN_NOTE_DURATION) {
     const roundedMidi = Math.round(
       (detections.slice(
@@ -263,7 +274,7 @@ export async function detectPitches(
   const maxRms = detections.reduce((max, d) => Math.max(max, d.rms), 0);
 
   // Segment into discrete notes
-  const notes = segmentNotes(detections, maxRms);
+  const notes = segmentNotes(detections, maxRms, audioBuffer.sampleRate);
 
   // Overall confidence = mean of note confidences
   const avgConfidence =
