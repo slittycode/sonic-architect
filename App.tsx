@@ -12,10 +12,13 @@ import {
   Cpu,
   Cloud,
 } from 'lucide-react';
-import { AnalysisStatus, AnalysisProvider, ProviderType, ReconstructionBlueprint } from './types';
+import { AnalysisStatus, AnalysisProvider, ProviderType, ReconstructionBlueprint, PitchDetectionResult } from './types';
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
+import SessionMusician from './components/SessionMusician';
 import { LocalAnalysisProvider } from './services/localProvider';
+import { decodeAudioFile } from './services/audioAnalysis';
+import { detectPitches } from './services/pitchDetection';
 
 const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
 
@@ -40,6 +43,11 @@ const App: React.FC = () => {
   const [providerType, setProviderType] = useState<ProviderType>(getStoredProvider);
   const [showSettings, setShowSettings] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
+
+  // Session Musician state
+  const [midiResult, setMidiResult] = useState<PitchDetectionResult | null>(null);
+  const [midiDetecting, setMidiDetecting] = useState(false);
+  const [midiError, setMidiError] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,16 +107,44 @@ const App: React.FC = () => {
   const triggerAnalysis = async (file: File) => {
     setStatus(AnalysisStatus.ANALYZING);
     setError(null);
-    try {
-      const provider = await getActiveProvider();
-      const result = await provider.analyze(file);
-      setBlueprint(result);
-      setStatus(AnalysisStatus.COMPLETED);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "An unexpected error occurred during analysis.");
-      setStatus(AnalysisStatus.ERROR);
-    }
+    setMidiResult(null);
+    setMidiError(null);
+
+    // Run blueprint analysis and pitch detection concurrently
+    // They share the decoded AudioBuffer from decodeAudioFile
+    const blueprintPromise = (async () => {
+      try {
+        const provider = await getActiveProvider();
+        const result = await provider.analyze(file);
+        setBlueprint(result);
+        setStatus(AnalysisStatus.COMPLETED);
+        return result;
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || "An unexpected error occurred during analysis.");
+        setStatus(AnalysisStatus.ERROR);
+        return null;
+      }
+    })();
+
+    const pitchPromise = (async () => {
+      try {
+        setMidiDetecting(true);
+        const audioBuffer = await decodeAudioFile(file);
+        // Use BPM from blueprint if available, otherwise default
+        const bpResult = await blueprintPromise;
+        const bpm = bpResult?.telemetry?.bpm ? parseFloat(bpResult.telemetry.bpm) || 120 : 120;
+        const pitchResult = await detectPitches(audioBuffer, bpm);
+        setMidiResult(pitchResult);
+      } catch (err: any) {
+        console.error('Pitch detection error:', err);
+        setMidiError(err.message || 'Pitch detection failed.');
+      } finally {
+        setMidiDetecting(false);
+      }
+    })();
+
+    await Promise.allSettled([blueprintPromise, pitchPromise]);
   };
 
   const resetAll = () => {
@@ -119,6 +155,9 @@ const App: React.FC = () => {
     setError(null);
     setFileName(null);
     setLastFile(null);
+    setMidiResult(null);
+    setMidiDetecting(false);
+    setMidiError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -348,6 +387,16 @@ const App: React.FC = () => {
             )}
             <BlueprintDisplay blueprint={blueprint} />
           </>
+        )}
+
+        {/* Session Musician — renders when detection is running or has results */}
+        {(midiDetecting || midiResult || midiError) && (
+          <SessionMusician
+            result={midiResult}
+            detecting={midiDetecting}
+            error={midiError}
+            fileName={fileName}
+          />
         )}
 
         {!blueprint && status === AnalysisStatus.IDLE && (

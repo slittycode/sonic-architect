@@ -89,3 +89,47 @@ export interface SpectralBandEnergy {
   peakDb: number;
   dominance: 'dominant' | 'present' | 'weak' | 'absent';
 }
+
+// --- Session Musician (Audio-to-MIDI) ---
+
+export interface DetectedNote {
+  /** MIDI note number (0-127) */
+  midi: number;
+  /** Note name, e.g. "C4", "F#3" */
+  name: string;
+  /** Frequency in Hz */
+  frequency: number;
+  /** Start time in seconds */
+  startTime: number;
+  /** Duration in seconds */
+  duration: number;
+  /** Velocity 0-127 */
+  velocity: number;
+  /** Detection confidence 0-1 */
+  confidence: number;
+}
+
+export type QuantizeGrid = '1/4' | '1/8' | '1/16' | '1/32' | 'off';
+
+export interface QuantizeOptions {
+  grid: QuantizeGrid;
+  /** Swing amount 0-100 */
+  swing: number;
+}
+
+export interface PitchDetectionResult {
+  notes: DetectedNote[];
+  /** Overall detection confidence */
+  confidence: number;
+  /** Duration of analyzed audio in seconds */
+  duration: number;
+  /** Detected BPM (used for quantization grid alignment) */
+  bpm: number;
+}
+
+export interface SessionMusicianState {
+  status: 'idle' | 'detecting' | 'done' | 'error';
+  result: PitchDetectionResult | null;
+  quantizeOptions: QuantizeOptions;
+  error: string | null;
+}
