@@ -1,12 +1,64 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { ReconstructionBlueprint } from "../types";
+import { GoogleGenAI } from "@google/genai";
+import { AnalysisProvider, ReconstructionBlueprint } from "../types";
 
-export const analyzeAudio = async (
+/**
+ * Gemini Provider — Cloud-based multimodal analysis.
+ * Requires VITE_GEMINI_API_KEY. Kept as opt-in legacy provider.
+ */
+export class GeminiProvider implements AnalysisProvider {
+  name = 'Gemini 1.5 Pro (Cloud)';
+  type = 'gemini' as const;
+
+  async isAvailable(): Promise<boolean> {
+    const key = import.meta.env.VITE_GEMINI_API_KEY;
+    return typeof key === 'string' && key.length > 0;
+  }
+
+  async analyze(file: File): Promise<ReconstructionBlueprint> {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Missing API key. Set GEMINI_API_KEY in .env.local to use the Gemini provider.');
+    }
+
+    const startTime = performance.now();
+
+    // Read file as base64
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = (reader.result as string).split(',')[1];
+        resolve(result);
+      };
+      reader.onerror = () => reject(new Error('Failed to read audio file.'));
+      reader.readAsDataURL(file);
+    });
+
+    const result = await analyzeAudioWithGemini(base64, file.type, apiKey);
+    const analysisTime = Math.round(performance.now() - startTime);
+
+    return {
+      ...result,
+      meta: {
+        provider: 'gemini',
+        analysisTime,
+        sampleRate: 0, // Unknown from Gemini
+        duration: 0,
+        channels: 0,
+      },
+    };
+  }
+}
+
+/**
+ * Core Gemini API call — kept as standalone for backward compatibility.
+ */
+async function analyzeAudioWithGemini(
   base64Audio: string,
-  mimeType: string
-): Promise<ReconstructionBlueprint> => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
+  mimeType: string,
+  apiKey: string
+): Promise<ReconstructionBlueprint> {
+  const ai = new GoogleGenAI({ apiKey });
 
   const prompt = `You are a world-class Audio Engineer and Electronic Music Producer expert in Ableton Live 12.
   Analyze this audio file and deconstruct it into a "Reconstruction Blueprint".
@@ -52,13 +104,10 @@ export const analyzeAudio = async (
     ],
     config: {
       responseMimeType: "application/json",
-      // We don't define responseSchema here to allow Pro model flexibility, 
-      // but the prompt strictly requests the format.
     }
   });
 
   const text = response.text || "{}";
-  // Strip markdown code blocks if present
   const cleanedText = text.replace(/```json\n|\n```/g, '').replace(/```/g, '');
   try {
     return JSON.parse(cleanedText) as ReconstructionBlueprint;
@@ -66,4 +115,13 @@ export const analyzeAudio = async (
     console.error("Failed to parse Gemini response as JSON:", text);
     throw new Error("Could not parse analysis results. Please try again.");
   }
+}
+
+// Legacy export for backward compatibility
+export const analyzeAudio = async (
+  base64Audio: string,
+  mimeType: string
+): Promise<ReconstructionBlueprint> => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+  return analyzeAudioWithGemini(base64Audio, mimeType, apiKey);
 };
