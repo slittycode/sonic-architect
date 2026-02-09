@@ -26,6 +26,11 @@ const App: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const hasApiKey = Boolean(
+    import.meta.env.VITE_GEMINI_API_KEY &&
+    String(import.meta.env.VITE_GEMINI_API_KEY).trim()
+  );
+
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -141,6 +146,17 @@ const App: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {!hasApiKey && (
+        <div className="w-full max-w-6xl px-6 mt-4" role="alert">
+          <div className="p-4 bg-amber-900/30 border border-amber-700/50 rounded-lg flex items-center gap-3 text-amber-200">
+            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" aria-hidden="true" />
+            <p className="text-sm">
+              Missing API key. Set <code className="bg-amber-900/50 px-1 rounded mono text-xs">GEMINI_API_KEY</code> in <code className="bg-amber-900/50 px-1 rounded mono text-xs">.env.local</code> to analyze audio.
+            </p>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-6xl w-full px-6 mt-8 space-y-8">
         {/* Playback & Visualization */}
