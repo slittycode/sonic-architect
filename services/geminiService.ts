@@ -1,6 +1,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { AnalysisProvider, ReconstructionBlueprint } from "../types";
+import { validateBlueprint } from "./blueprintValidation";
 
 /**
  * Gemini Provider — Cloud-based multimodal analysis.
@@ -110,7 +111,7 @@ async function analyzeAudioWithGemini(
   const text = response.text || "{}";
   const cleanedText = text.replace(/```json\n|\n```/g, '').replace(/```/g, '');
   try {
-    return JSON.parse(cleanedText) as ReconstructionBlueprint;
+    return validateBlueprint(JSON.parse(cleanedText));
   } catch (e) {
     console.error("Failed to parse Gemini response as JSON:", text);
     throw new Error("Could not parse analysis results. Please try again.");

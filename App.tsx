@@ -9,12 +9,15 @@ import {
   AlertCircle,
   Activity,
   Settings,
+  Download,
+  FileText,
 } from 'lucide-react';
 import { AnalysisStatus, AnalysisProvider, ProviderType, ProviderCredentials, ReconstructionBlueprint } from './types';
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
 import { LocalAnalysisProvider } from './services/localProvider';
 import { ProviderSettings, getEffectiveCredentials, saveCredentials } from './components/ProviderSettings';
+import { exportBlueprintJSON, exportBlueprintMarkdown } from './services/blueprintExport';
 
 const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
 
@@ -40,9 +43,13 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
   const [credentials, setCredentials] = useState<ProviderCredentials>(getEffectiveCredentials);
+  const [audioPeaks, setAudioPeaks] = useState<Float32Array | null>(null);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [analysisStage, setAnalysisStage] = useState<string>('');
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const MAX_FILE_SIZE = 100 * 1024 * 1024;
   const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
@@ -130,25 +137,66 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(file);
     setAudioUrl(url);
 
+    // Extract waveform peaks from audio data
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioCtx = new OfflineAudioContext(1, 1, 44100);
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+      const channelData = audioBuffer.getChannelData(0);
+      setAudioPeaks(channelData);
+      setAudioDuration(audioBuffer.duration);
+    } catch (e) {
+      console.warn('Could not decode audio for waveform display:', e);
+    }
+
     await triggerAnalysis(file);
   };
 
   const triggerAnalysis = async (file: File) => {
+    // Cancel any in-flight analysis
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setStatus(AnalysisStatus.ANALYZING);
     setError(null);
+    setAnalysisStage('Initializing provider...');
     try {
       const provider = await getActiveProvider();
+
+      if (controller.signal.aborted) return;
+      setAnalysisStage(
+        providerType === 'local'
+          ? 'Decoding audio & extracting DSP features...'
+          : 'Phase 1: Decoding audio & DSP feature extraction...',
+      );
+
       const result = await provider.analyze(file);
+
+      if (controller.signal.aborted) return;
+      setAnalysisStage('');
       setBlueprint(result);
       setStatus(AnalysisStatus.COMPLETED);
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       console.error(err);
       setError(err.message || "An unexpected error occurred during analysis.");
       setStatus(AnalysisStatus.ERROR);
+      setAnalysisStage('');
     }
   };
 
+  const cancelAnalysis = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStatus(AnalysisStatus.IDLE);
+    setAnalysisStage('');
+    setError(null);
+  };
+
   const resetAll = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setStatus(AnalysisStatus.IDLE);
     setBlueprint(null);
     setAudioUrl(null);
@@ -156,6 +204,9 @@ const App: React.FC = () => {
     setError(null);
     setFileName(null);
     setLastFile(null);
+    setAudioPeaks(null);
+    setAudioDuration(0);
+    setAnalysisStage('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -282,7 +333,13 @@ const App: React.FC = () => {
           </div>
           
           <React.Suspense fallback={<WaveformSkeleton />}>
-            <WaveformVisualizer audioUrl={audioUrl} isPlaying={isPlaying} />
+            <WaveformVisualizer
+              audioUrl={audioUrl}
+              isPlaying={isPlaying}
+              peaks={audioPeaks}
+              duration={audioDuration}
+              audioRef={audioRef}
+            />
           </React.Suspense>
           
           {audioUrl && (
@@ -297,18 +354,24 @@ const App: React.FC = () => {
           {status === AnalysisStatus.ANALYZING && (
             <div className="mt-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg flex items-center gap-4 animate-pulse">
               <Activity className="w-5 h-5 text-blue-400 animate-spin" aria-hidden="true" />
-              <div className="flex flex-col">
+              <div className="flex flex-col flex-1">
                 <span className="text-sm font-semibold text-blue-200">
                   {providerType === 'local'
                     ? 'Analyzing Audio Spectrogram...'
                     : `Analyzing Audio & Querying ${PROVIDER_LABELS[providerType]}...`}
                 </span>
                 <span className="text-xs text-blue-400/80">
-                  {providerType === 'local'
+                  {analysisStage || (providerType === 'local'
                     ? 'Extracting BPM, key, spectral features, and onset data...'
-                    : 'Phase 1: DSP feature extraction. Phase 2: LLM-enhanced descriptions...'}
+                    : 'Phase 1: DSP feature extraction. Phase 2: LLM-enhanced descriptions...')}
                 </span>
               </div>
+              <button
+                onClick={cancelAnalysis}
+                className="flex-shrink-0 px-3 py-1.5 text-xs bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 transition-colors border border-zinc-700/50"
+              >
+                Cancel
+              </button>
             </div>
           )}
 
@@ -348,34 +411,54 @@ const App: React.FC = () => {
           <>
             {/* Analysis metadata bar */}
             {blueprint.meta && (
-              <div className="flex items-center gap-4 text-[10px] mono text-zinc-500 uppercase tracking-widest px-1">
-                <span>Engine: {PROVIDER_LABELS[blueprint.meta.provider as ProviderType] ?? blueprint.meta.provider}</span>
-                <span className="text-zinc-700">|</span>
-                <span>Analyzed in {blueprint.meta.analysisTime}ms</span>
-                {blueprint.meta.sampleRate > 0 && (
-                  <>
-                    <span className="text-zinc-700">|</span>
-                    <span>{blueprint.meta.sampleRate / 1000}kHz / {blueprint.meta.channels}ch</span>
-                  </>
-                )}
-                {blueprint.meta.duration > 0 && (
-                  <>
-                    <span className="text-zinc-700">|</span>
-                    <span>{Math.floor(blueprint.meta.duration / 60)}:{Math.floor(blueprint.meta.duration % 60).toString().padStart(2, '0')}</span>
-                  </>
-                )}
-                {blueprint.telemetry.bpmConfidence != null && (
-                  <>
-                    <span className="text-zinc-700">|</span>
-                    <span>BPM conf: {Math.round(blueprint.telemetry.bpmConfidence * 100)}%</span>
-                  </>
-                )}
-                {blueprint.telemetry.keyConfidence != null && (
-                  <>
-                    <span className="text-zinc-700">|</span>
-                    <span>Key conf: {Math.round(blueprint.telemetry.keyConfidence * 100)}%</span>
-                  </>
-                )}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-4 text-[10px] mono text-zinc-500 uppercase tracking-widest">
+                  <span>Engine: {PROVIDER_LABELS[blueprint.meta.provider as ProviderType] ?? blueprint.meta.provider}</span>
+                  <span className="text-zinc-700">|</span>
+                  <span>Analyzed in {blueprint.meta.analysisTime}ms</span>
+                  {blueprint.meta.sampleRate > 0 && (
+                    <>
+                      <span className="text-zinc-700">|</span>
+                      <span>{blueprint.meta.sampleRate / 1000}kHz / {blueprint.meta.channels}ch</span>
+                    </>
+                  )}
+                  {blueprint.meta.duration > 0 && (
+                    <>
+                      <span className="text-zinc-700">|</span>
+                      <span>{Math.floor(blueprint.meta.duration / 60)}:{Math.floor(blueprint.meta.duration % 60).toString().padStart(2, '0')}</span>
+                    </>
+                  )}
+                  {blueprint.telemetry.bpmConfidence != null && (
+                    <>
+                      <span className="text-zinc-700">|</span>
+                      <span>BPM conf: {Math.round(blueprint.telemetry.bpmConfidence * 100)}%</span>
+                    </>
+                  )}
+                  {blueprint.telemetry.keyConfidence != null && (
+                    <>
+                      <span className="text-zinc-700">|</span>
+                      <span>Key conf: {Math.round(blueprint.telemetry.keyConfidence * 100)}%</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => exportBlueprintJSON(blueprint, fileName ? `${fileName.replace(/\.[^.]+$/, '')}-blueprint.json` : undefined)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] mono uppercase tracking-widest text-zinc-400 bg-zinc-800/50 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700/50 rounded-md transition-colors"
+                    title="Download blueprint as JSON"
+                  >
+                    <Download className="w-3 h-3" aria-hidden="true" />
+                    JSON
+                  </button>
+                  <button
+                    onClick={() => exportBlueprintMarkdown(blueprint, fileName ? `${fileName.replace(/\.[^.]+$/, '')}-report.md` : undefined)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] mono uppercase tracking-widest text-zinc-400 bg-zinc-800/50 hover:bg-zinc-700 hover:text-zinc-200 border border-zinc-700/50 rounded-md transition-colors"
+                    title="Download blueprint as Markdown report"
+                  >
+                    <FileText className="w-3 h-3" aria-hidden="true" />
+                    Report
+                  </button>
+                </div>
               </div>
             )}
             <BlueprintDisplay blueprint={blueprint} />

@@ -1,90 +1,186 @@
 
-import React, { useEffect, useRef, useMemo } from 'react';
-import * as d3 from 'd3';
+import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 
 interface WaveformVisualizerProps {
   audioUrl: string | null;
   isPlaying: boolean;
+  peaks: Float32Array | null;
+  duration: number;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
 }
 
-const WaveformVisualizer: React.FC<WaveformVisualizerProps> = React.memo(({ audioUrl, isPlaying }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+/** Downsample raw channel data into peak values for visualization. */
+function extractPeaks(data: Float32Array, numBars: number): number[] {
+  const blockSize = Math.floor(data.length / numBars);
+  if (blockSize === 0) return Array.from({ length: numBars }, () => 0);
+  const peaks: number[] = [];
+  for (let i = 0; i < numBars; i++) {
+    let max = 0;
+    const start = i * blockSize;
+    const end = Math.min(start + blockSize, data.length);
+    for (let j = start; j < end; j++) {
+      const abs = Math.abs(data[j]);
+      if (abs > max) max = abs;
+    }
+    peaks.push(max);
+  }
+  return peaks;
+}
 
-  // Store the initial random data so it doesn't change on re-renders/play toggle
-  const initialData = useMemo(() => {
-    // Re-generate only if audioUrl changes (mocking new file analysis)
-    return Array.from({ length: 60 }, () => Math.random());
-  }, [audioUrl]);
+const WaveformVisualizer: React.FC<WaveformVisualizerProps> = React.memo(
+  ({ audioUrl, isPlaying, peaks: rawPeaks, duration, audioRef }) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const animationRef = useRef<number>(0);
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-  // Initialization Effect: Draw the chart structure
-  useEffect(() => {
-    if (!containerRef.current || !svgRef.current) return;
+    const NUM_BARS = 200;
+    const BAR_GAP = 1;
+    const CANVAS_HEIGHT = 128;
 
-    // Clear previous elements only when audioUrl changes (or on mount)
-    const svgSelection = d3.select(svgRef.current);
-    svgSelection.selectAll('*').remove();
+    // Downsample raw channel data to display bars
+    const peakData = useMemo(() => {
+      if (!rawPeaks) return null;
+      return extractPeaks(rawPeaks, NUM_BARS);
+    }, [rawPeaks]);
 
-    const width = containerRef.current.clientWidth;
-    const height = 120;
+    // Resize observer
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
 
-    svgSelection
-      .attr('width', width)
-      .attr('height', height);
+      const observer = new ResizeObserver((entries) => {
+        const { width } = entries[0].contentRect;
+        setDimensions({ width, height: CANVAS_HEIGHT });
+      });
+      observer.observe(container);
+      // Initial dimension
+      setDimensions({ width: container.clientWidth, height: CANVAS_HEIGHT });
 
-    const barCount = 60;
-    const barWidth = (width / barCount) - 2;
+      return () => observer.disconnect();
+    }, []);
 
-    // Scale data to height
-    const scaledData = initialData.map(v => v * height);
+    // Draw waveform and playback cursor
+    const draw = useCallback(() => {
+      const canvas = canvasRef.current;
+      if (!canvas || !peakData) return;
 
-    svgSelection.selectAll('rect')
-      .data(scaledData)
-      .enter()
-      .append('rect')
-      .attr('x', (d, i) => i * (barWidth + 2))
-      .attr('y', d => (height - d) / 2)
-      .attr('width', barWidth)
-      .attr('height', d => d)
-      .attr('fill', '#3b82f6')
-      .attr('opacity', 0.6)
-      .attr('rx', 2);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-  }, [audioUrl, initialData]);
+      const { width, height } = dimensions;
+      if (width === 0) return;
 
-  // Animation Effect: Handle Play/Pause
-  useEffect(() => {
-    if (!isPlaying || !svgRef.current) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
 
-    const svg = d3.select(svgRef.current);
-    const height = 120;
+      ctx.clearRect(0, 0, width, height);
 
-    // Animate bars to random heights to simulate visualization
-    // Optimization: Use data binding + single transition call instead of .each() loop
-    // This reduces object creation overhead and leverages D3's batched DOM updates.
-    const interval = setInterval(() => {
-         const rects = svg.selectAll('rect');
-         const count = rects.size();
-         const newData = Array.from({ length: count }, () => Math.random() * height);
+      const barWidth = Math.max(1, (width / NUM_BARS) - BAR_GAP);
+      const currentTime = audioRef.current?.currentTime ?? 0;
+      const progress = duration > 0 ? currentTime / duration : 0;
+      const playedBars = Math.floor(progress * NUM_BARS);
 
-         rects.data(newData)
-            .transition()
-            .duration(200)
-            .ease(d3.easeLinear)
-            .attr('height', d => d)
-            .attr('y', d => (height - d) / 2);
-    }, 200);
+      // Normalize peaks
+      const maxPeak = Math.max(...peakData, 0.01);
 
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+      // Draw bars
+      for (let i = 0; i < peakData.length; i++) {
+        const normalized = peakData[i] / maxPeak;
+        const barHeight = Math.max(2, normalized * (height - 4));
+        const x = i * (barWidth + BAR_GAP);
+        const y = (height - barHeight) / 2;
 
-  return (
-    <div ref={containerRef} className="w-full h-32 bg-zinc-900/50 rounded-lg flex items-center justify-center border border-zinc-800 relative overflow-hidden">
-      <svg ref={svgRef} className="z-10"></svg>
-      {!audioUrl && <div className="text-zinc-500 text-sm">No audio loaded</div>}
-      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/20 to-transparent pointer-events-none"></div>
-    </div>
-  );
-});
+        if (i < playedBars) {
+          ctx.fillStyle = '#3b82f6'; // blue-500 — played
+        } else if (i === playedBars) {
+          ctx.fillStyle = '#60a5fa'; // blue-400 — current
+        } else {
+          ctx.fillStyle = 'rgba(59, 130, 246, 0.35)'; // dimmed unplayed
+        }
+
+        ctx.beginPath();
+        ctx.roundRect(x, y, barWidth, barHeight, 1);
+        ctx.fill();
+      }
+
+      // Draw playback cursor line
+      if (duration > 0 && audioRef.current) {
+        const cursorX = progress * width;
+        ctx.beginPath();
+        ctx.strokeStyle = '#f8fafc'; // white
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(cursorX, 0);
+        ctx.lineTo(cursorX, height);
+        ctx.stroke();
+
+        // Time label
+        const mins = Math.floor(currentTime / 60);
+        const secs = Math.floor(currentTime % 60);
+        const totalMins = Math.floor(duration / 60);
+        const totalSecs = Math.floor(duration % 60);
+        const timeStr = `${mins}:${secs.toString().padStart(2, '0')} / ${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
+        ctx.font = '10px "JetBrains Mono", monospace';
+        ctx.fillStyle = 'rgba(244, 244, 245, 0.7)';
+        const textWidth = ctx.measureText(timeStr).width;
+        const textX = Math.min(cursorX + 6, width - textWidth - 4);
+        ctx.fillText(timeStr, textX, 12);
+      }
+    }, [peakData, dimensions, duration, audioRef]);
+
+    // Animation loop during playback
+    useEffect(() => {
+      if (!peakData) return;
+
+      if (isPlaying) {
+        const animate = () => {
+          draw();
+          animationRef.current = requestAnimationFrame(animate);
+        };
+        animationRef.current = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(animationRef.current);
+      } else {
+        // Draw static frame when paused
+        draw();
+      }
+    }, [isPlaying, draw, peakData]);
+
+    // Click-to-seek
+    const handleClick = useCallback(
+      (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!audioRef.current || duration === 0) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const ratio = x / rect.width;
+        audioRef.current.currentTime = ratio * duration;
+        draw();
+      },
+      [audioRef, duration, draw],
+    );
+
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-32 bg-zinc-900/50 rounded-lg flex items-center justify-center border border-zinc-800 relative overflow-hidden"
+      >
+        {peakData ? (
+          <canvas
+            ref={canvasRef}
+            onClick={handleClick}
+            className="z-10 cursor-pointer"
+            style={{ width: dimensions.width, height: dimensions.height }}
+          />
+        ) : (
+          <div className="text-zinc-500 text-sm">
+            {audioUrl ? 'Decoding audio...' : 'No audio loaded'}
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/20 to-transparent pointer-events-none" />
+      </div>
+    );
+  },
+);
 
 export default WaveformVisualizer;

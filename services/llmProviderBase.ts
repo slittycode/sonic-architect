@@ -22,6 +22,7 @@ import {
   getFXRecommendations,
   getSecretSauce,
 } from '../data/abletonDevices';
+import { validateBlueprint } from './blueprintValidation';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -314,7 +315,7 @@ export async function analyzeWithLLM(
   const features = extractAudioFeatures(audioBuffer);
   const localBlueprint = buildLocalBlueprint(features, provider);
 
-  // Phase 2: LLM Enhancement (best-effort)
+// Phase 2: LLM Enhancement (best-effort)
   try {
     const prompt = buildEnhancementPrompt(features);
     const raw = await queryFn(prompt);
@@ -327,10 +328,10 @@ export async function analyzeWithLLM(
       ...enhanced.meta!,
       analysisTime: Math.round(performance.now() - startTime),
     };
-    return enhanced;
+    return validateBlueprint(enhanced);
   } catch (err) {
     console.warn(`LLM enhancement failed (${provider}), using local-only blueprint:`, err);
     localBlueprint.meta!.analysisTime = Math.round(performance.now() - startTime);
-    return localBlueprint;
+    return validateBlueprint(localBlueprint);
   }
 }
