@@ -500,7 +500,7 @@ const App: React.FC = () => {
                 )}
               </div>
             )}
-            <BlueprintDisplay blueprint={blueprint} />
+            <BlueprintDisplay blueprint={blueprint} filename={fileName} />
           </>
         )}
 

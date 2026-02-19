@@ -51,6 +51,14 @@ The app works fully offline with the Local DSP engine. To enable cloud analysis 
 | `pnpm build` | Production build to `dist/` |
 | `pnpm preview` | Preview the production build locally |
 
+## Deployment
+
+- One-click deploy on Vercel: [vercel.com/new](https://vercel.com/new)
+- `GEMINI_API_KEY` is optional. Local analysis works without it.
+- This app is a static SPA, so no server is required.
+- Build command: `npm run build`
+- Output directory: `dist`
+
 ## Tech Stack
 
 - **React 19** + **TypeScript 5.8** + **Vite 6**
