@@ -1,4 +1,3 @@
-
 export interface GlobalTelemetry {
   bpm: string;
   key: string;
@@ -25,6 +24,19 @@ export interface FXChainItem {
   recommendation: string;
 }
 
+export interface ChordSegment {
+  /** Time range string, e.g. "0:04–0:08" */
+  timeRange: string;
+  /** Chord symbol, e.g. "Am", "Fmaj7" */
+  chord: string;
+  /** Root note name */
+  root: string;
+  /** Chord quality (Major, Minor, etc.) */
+  quality: string;
+  /** Detection confidence 0-1 */
+  confidence: number;
+}
+
 export interface SecretSauce {
   trick: string;
   execution: string;
@@ -41,6 +53,8 @@ export interface AnalysisMeta {
 export interface ReconstructionBlueprint {
   telemetry: GlobalTelemetry;
   arrangement: ArrangementSection[];
+  chordProgression?: ChordSegment[];
+  chordProgressionSummary?: string;
   instrumentation: InstrumentRackElement[];
   fxChain: FXChainItem[];
   secretSauce: SecretSauce;
@@ -52,7 +66,7 @@ export enum AnalysisStatus {
   UPLOADING = 'UPLOADING',
   ANALYZING = 'ANALYZING',
   COMPLETED = 'COMPLETED',
-  ERROR = 'ERROR'
+  ERROR = 'ERROR',
 }
 
 // Provider types
@@ -72,11 +86,11 @@ export interface AudioFeatures {
   key: { root: string; scale: string; confidence: number };
   spectralCentroidMean: number;
   rmsMean: number;
-  rmsProfile: number[];        // energy over time (for arrangement)
+  rmsProfile: number[]; // energy over time (for arrangement)
   spectralBands: SpectralBandEnergy[];
-  crestFactor: number;         // peak-to-RMS ratio (compression indicator)
+  crestFactor: number; // peak-to-RMS ratio (compression indicator)
   onsetCount: number;
-  onsetDensity: number;        // onsets per second
+  onsetDensity: number; // onsets per second
   duration: number;
   sampleRate: number;
   channels: number;

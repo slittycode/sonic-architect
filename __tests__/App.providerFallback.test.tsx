@@ -126,7 +126,9 @@ describe('App provider fallback', () => {
     fireEvent.click(screen.getByLabelText(/analysis engine settings/i));
     fireEvent.click(screen.getByText('Ollama + Local DSP'));
 
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
+    const fileInput = container.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement | null;
     expect(fileInput).not.toBeNull();
     if (!fileInput) return;
 
@@ -137,7 +139,7 @@ describe('App provider fallback', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Ollama not detected\. Using Local DSP Engine\./i),
+        screen.getByText(/Ollama not detected\. Using Local DSP Engine\./i)
       ).toBeInTheDocument();
     });
 

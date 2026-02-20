@@ -4,25 +4,25 @@ import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
+  const env = loadEnv(mode, '.', '');
+  return {
+    server: {
+      port: 3000,
+      host: '0.0.0.0',
+    },
+    plugins: [react()],
+    define: {
+      // Expose VITE_GEMINI_API_KEY to the client if it's set in environment
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
       },
-      plugins: [react()],
-      define: {
-        // Expose VITE_GEMINI_API_KEY to the client if it's set in environment
-        'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
-      },
-      test: {
-        environment: 'jsdom',
-        setupFiles: './vitest.setup.ts',
-      }
-    };
+    },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './vitest.setup.ts',
+    },
+  };
 });

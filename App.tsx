@@ -1,27 +1,43 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  AudioLines, 
-  Upload, 
-  Play, 
-  Pause, 
-  Music2, 
+import {
+  AudioLines,
+  Upload,
+  Play,
+  Pause,
+  Music2,
   AlertCircle,
   Activity,
   Settings,
   Cpu,
   Cloud,
 } from 'lucide-react';
-import { AnalysisStatus, AnalysisProvider, ProviderType, ReconstructionBlueprint, PitchDetectionResult } from './types';
+import {
+  AnalysisStatus,
+  AnalysisProvider,
+  ProviderType,
+  ReconstructionBlueprint,
+  PitchDetectionResult,
+} from './types';
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
 import SessionMusician from './components/SessionMusician';
+import LandingHero from './components/LandingHero';
+import FileFormatBadges from './components/FileFormatBadges';
 import { LocalAnalysisProvider } from './services/localProvider';
 import { OllamaProvider } from './services/ollamaProvider';
-import { decodeAudioFile, extractWaveformPeaks } from './services/audioAnalysis';
+import {
+  decodeAudioFile,
+  extractWaveformPeaks,
+} from './services/audioAnalysis';
 import { detectPitches } from './services/pitchDetection';
+import {
+  getFirstTimeUserState,
+  markAnalysisComplete,
+} from './utils/firstTimeUser';
 
-const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
+const WaveformVisualizer = React.lazy(
+  () => import('./components/WaveformVisualizer')
+);
 
 // Initialize providers
 const localProvider = new LocalAnalysisProvider();
@@ -30,19 +46,23 @@ const ollamaProvider = new OllamaProvider(localProvider);
 function getStoredProvider(): ProviderType {
   try {
     const stored = localStorage.getItem('sonic-architect-provider');
-    if (stored === 'gemini' || stored === 'local' || stored === 'ollama') return stored;
+    if (stored === 'gemini' || stored === 'local' || stored === 'ollama')
+      return stored;
   } catch {}
   return 'local';
 }
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<AnalysisStatus>(AnalysisStatus.IDLE);
-  const [blueprint, setBlueprint] = useState<ReconstructionBlueprint | null>(null);
+  const [blueprint, setBlueprint] = useState<ReconstructionBlueprint | null>(
+    null
+  );
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [providerType, setProviderType] = useState<ProviderType>(getStoredProvider);
+  const [providerType, setProviderType] =
+    useState<ProviderType>(getStoredProvider);
   const [showSettings, setShowSettings] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
   const [providerNotice, setProviderNotice] = useState<string | null>(null);
@@ -50,8 +70,17 @@ const App: React.FC = () => {
   const [waveformDuration, setWaveformDuration] = useState(0);
   const [playbackProgress, setPlaybackProgress] = useState(0);
 
+  // First-time user state
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(true);
+
+  // Drag-and-drop state
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [dragError, setDragError] = useState<string | null>(null);
+
   // Session Musician state
-  const [midiResult, setMidiResult] = useState<PitchDetectionResult | null>(null);
+  const [midiResult, setMidiResult] = useState<PitchDetectionResult | null>(
+    null
+  );
   const [midiDetecting, setMidiDetecting] = useState(false);
   const [midiError, setMidiError] = useState<string | null>(null);
 
@@ -61,6 +90,13 @@ const App: React.FC = () => {
 
   const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB (local analysis can handle larger files)
   const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
+  const SUPPORTED_FORMATS = ['WAV', 'MP3', 'FLAC', 'OGG', 'AAC', 'M4A'];
+
+  // Load first-time user state on mount
+  useEffect(() => {
+    const state = getFirstTimeUserState();
+    setIsFirstTimeUser(!state.hasCompletedAnalysis);
+  }, []);
 
   const replaceAudioUrl = useCallback((nextUrl: string | null) => {
     if (objectUrlRef.current) {
@@ -81,7 +117,9 @@ const App: React.FC = () => {
   const handleProviderChange = (type: ProviderType) => {
     setProviderType(type);
     setProviderNotice(null);
-    try { localStorage.setItem('sonic-architect-provider', type); } catch {}
+    try {
+      localStorage.setItem('sonic-architect-provider', type);
+    } catch {}
     setShowSettings(false);
   };
 
@@ -90,7 +128,9 @@ const App: React.FC = () => {
 
     if (providerType === 'ollama') {
       if (await ollamaProvider.isAvailable()) return ollamaProvider;
-      setProviderNotice('Ollama not detected. Using Local DSP Engine. Start Ollama with `ollama serve`.');
+      setProviderNotice(
+        'Ollama not detected. Using Local DSP Engine. Start Ollama with `ollama serve`.'
+      );
       return localProvider;
     }
 
@@ -106,23 +146,39 @@ const App: React.FC = () => {
     return localProvider;
   }, [providerType]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setError(null);
+    processFile(file);
+  };
 
+  const validateFile = (file: File): string | null => {
     if (file.size > MAX_FILE_SIZE) {
-      setError(`File size exceeds limit (${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB). Please upload a smaller stem.`);
-      return;
+      return `File size exceeds ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB limit. Please upload a smaller file.`;
     }
 
     const isAudioType = file.type.startsWith('audio/');
     const isAudioExtension = /\.(mp3|wav|ogg|aac|m4a|flac)$/i.test(file.name);
 
     if (!isAudioType && !isAudioExtension) {
-       setError("Invalid file type. Please upload an audio file.");
-       return;
+      return 'Unsupported file type. Please upload WAV, MP3, FLAC, OGG, AAC, or M4A files.';
+    }
+
+    return null;
+  };
+
+  const processFile = async (file: File) => {
+    setError(null);
+    setDragError(null);
+
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
+      setDragError(validationError);
+      return;
     }
 
     if (file.size > LARGE_FILE_THRESHOLD) {
@@ -140,6 +196,38 @@ const App: React.FC = () => {
     await triggerAnalysis(file);
   };
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (status === AnalysisStatus.ANALYZING) return;
+    setIsDragOver(true);
+    setDragError(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (status === AnalysisStatus.ANALYZING) return;
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    await processFile(file);
+  };
+
   const triggerAnalysis = async (file: File) => {
     setStatus(AnalysisStatus.ANALYZING);
     setError(null);
@@ -154,12 +242,16 @@ const App: React.FC = () => {
     } catch (decodeError: any) {
       if (providerType !== 'gemini') {
         setStatus(AnalysisStatus.ERROR);
-        setError(decodeError?.message || 'Could not decode audio for local analysis.');
+        setError(
+          decodeError?.message || 'Could not decode audio for local analysis.'
+        );
         return;
       }
       setWaveformPeaks(null);
       setWaveformDuration(0);
-      setMidiError('Local decode failed. Session Musician is unavailable for this file.');
+      setMidiError(
+        'Local decode failed. Session Musician is unavailable for this file.'
+      );
     }
 
     // Run blueprint analysis and pitch detection concurrently
@@ -167,17 +259,30 @@ const App: React.FC = () => {
       try {
         const provider = await getActiveProvider();
         const maybeBufferProvider = provider as AnalysisProvider & {
-          analyzeAudioBuffer?: (audioBuffer: AudioBuffer) => Promise<ReconstructionBlueprint>;
+          analyzeAudioBuffer?: (
+            audioBuffer: AudioBuffer
+          ) => Promise<ReconstructionBlueprint>;
         };
-        const result = decodedBuffer && typeof maybeBufferProvider.analyzeAudioBuffer === 'function'
-          ? await maybeBufferProvider.analyzeAudioBuffer(decodedBuffer)
-          : await provider.analyze(file);
+        const result =
+          decodedBuffer &&
+          typeof maybeBufferProvider.analyzeAudioBuffer === 'function'
+            ? await maybeBufferProvider.analyzeAudioBuffer(decodedBuffer)
+            : await provider.analyze(file);
         setBlueprint(result);
         setStatus(AnalysisStatus.COMPLETED);
+        
+        // Mark first analysis complete
+        if (isFirstTimeUser) {
+          markAnalysisComplete();
+          setIsFirstTimeUser(false);
+        }
+        
         return result;
       } catch (err: any) {
         console.error(err);
-        setError(err.message || "An unexpected error occurred during analysis.");
+        setError(
+          err.message || 'An unexpected error occurred during analysis.'
+        );
         setStatus(AnalysisStatus.ERROR);
         return null;
       }
@@ -189,7 +294,9 @@ const App: React.FC = () => {
         setMidiDetecting(true);
         // Use BPM from blueprint if available, otherwise default
         const bpResult = await blueprintPromise;
-        const bpm = bpResult?.telemetry?.bpm ? parseFloat(bpResult.telemetry.bpm) || 120 : 120;
+        const bpm = bpResult?.telemetry?.bpm
+          ? parseFloat(bpResult.telemetry.bpm) || 120
+          : 120;
         const pitchResult = await detectPitches(decodedBuffer, bpm);
         setMidiResult(pitchResult);
       } catch (err: any) {
@@ -239,11 +346,12 @@ const App: React.FC = () => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
         const target = event.target as HTMLElement;
-        if (target.matches('input, textarea, button, a, [role="button"]')) return;
+        if (target.matches('input, textarea, button, a, [role="button"]'))
+          return;
 
         event.preventDefault();
         if (audioUrl) {
-            togglePlayback();
+          togglePlayback();
         }
       }
     };
@@ -269,8 +377,12 @@ const App: React.FC = () => {
               <AudioLines className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-zinc-100 uppercase">Sonic Architect</h1>
-              <p className="text-[10px] text-zinc-500 mono tracking-widest uppercase">Ableton Live 12 Deconstructor v2.0</p>
+              <h1 className="text-xl font-bold tracking-tight text-zinc-100 uppercase">
+                Sonic Architect
+              </h1>
+              <p className="text-[10px] text-zinc-500 mono tracking-widest uppercase">
+                Ableton Live 12 Deconstructor v2.0
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -288,43 +400,101 @@ const App: React.FC = () => {
               {showSettings && (
                 <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 overflow-hidden">
                   <div className="px-3 py-2 border-b border-zinc-800">
-                    <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Analysis Engine</p>
+                    <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+                      Analysis Engine
+                    </p>
                   </div>
                   <button
                     onClick={() => handleProviderChange('local')}
                     className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'local' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
                   >
-                    <Cpu className="w-4 h-4 text-emerald-400 flex-shrink-0" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Local DSP Engine</p>
-                      <p className="text-[10px] text-zinc-500">Client-side analysis. No API key needed. Works offline.</p>
+                    <Cpu
+                      className="w-4 h-4 text-emerald-400 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium text-zinc-200">
+                          Local DSP Engine
+                        </p>
+                        <span className="px-1.5 py-0.5 bg-emerald-600/20 text-emerald-400 text-[9px] font-bold uppercase rounded border border-emerald-600/30">
+                          Free
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500">
+                        No API key needed. Works offline.
+                      </p>
                     </div>
                   </button>
                   <button
                     onClick={() => handleProviderChange('gemini')}
                     className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'gemini' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
                   >
-                    <Cloud className="w-4 h-4 text-blue-400 flex-shrink-0" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Gemini 1.5 Pro</p>
-                      <p className="text-[10px] text-zinc-500">Cloud AI analysis. Requires API key in .env.local.</p>
+                    <Cloud
+                      className="w-4 h-4 text-blue-400 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium text-zinc-200">
+                          Gemini 1.5 Pro
+                        </p>
+                        <span className="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[9px] font-bold uppercase rounded border border-blue-600/30">
+                          Enhanced
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500">
+                        Cloud AI analysis. Requires API key.
+                      </p>
+                      {providerType === 'gemini' && providerNotice && (
+                        <a
+                          href="https://aistudio.google.com/app/apikey"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-400 hover:text-blue-300 underline mt-1 inline-block"
+                        >
+                          Get API key →
+                        </a>
+                      )}
                     </div>
                   </button>
                   <button
                     onClick={() => handleProviderChange('ollama')}
                     className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'ollama' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
                   >
-                    <Activity className="w-4 h-4 text-violet-400 flex-shrink-0" aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Ollama + Local DSP</p>
-                      <p className="text-[10px] text-zinc-500">Local analysis with optional local-LLM enhancement.</p>
+                    <Activity
+                      className="w-4 h-4 text-violet-400 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium text-zinc-200">
+                          Ollama + Local DSP
+                        </p>
+                        <span className="px-1.5 py-0.5 bg-blue-600/20 text-blue-400 text-[9px] font-bold uppercase rounded border border-blue-600/30">
+                          Enhanced
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500">
+                        Local analysis with LLM enhancement.
+                      </p>
+                      {providerType === 'ollama' && providerNotice && (
+                        <a
+                          href="https://ollama.com/download"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-violet-400 hover:text-violet-300 underline mt-1 inline-block"
+                        >
+                          Download Ollama →
+                        </a>
+                      )}
                     </div>
                   </button>
                 </div>
               )}
             </div>
 
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               disabled={status === AnalysisStatus.ANALYZING}
               className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-200 text-sm font-medium rounded-md transition-all border border-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
@@ -333,16 +503,22 @@ const App: React.FC = () => {
               <Upload className="w-4 h-4" aria-hidden="true" />
               Import Stem
             </button>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
               accept="audio/*"
               onChange={handleFileUpload}
             />
           </div>
         </div>
       </header>
+
+      {/* Landing Hero */}
+      <LandingHero 
+        isMinimized={!isFirstTimeUser} 
+        onDismiss={() => setIsFirstTimeUser(false)} 
+      />
 
       <main className="max-w-6xl w-full px-6 mt-8 space-y-8">
         {/* Playback & Visualization */}
@@ -352,22 +528,31 @@ const App: React.FC = () => {
               <div className="p-2 bg-zinc-800 rounded-full">
                 <Music2 className="w-5 h-5 text-blue-400" aria-hidden="true" />
               </div>
-              <span className="text-sm font-medium text-zinc-300 mono">{fileName || 'Awaiting Input...'}</span>
+              <span className="text-sm font-medium text-zinc-300 mono">
+                {fileName || 'Awaiting Input...'}
+              </span>
             </div>
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={togglePlayback}
                 disabled={!audioUrl}
                 className="w-12 h-12 flex items-center justify-center bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-full text-white transition-all transform active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none group relative"
-                aria-label={isPlaying ? "Pause playback" : "Start playback"}
+                aria-label={isPlaying ? 'Pause playback' : 'Start playback'}
                 aria-keyshortcuts="Space"
-                title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+                title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
               >
-                {isPlaying ? <Pause className="w-6 h-6 fill-current" aria-hidden="true" /> : <Play className="w-6 h-6 fill-current ml-1" aria-hidden="true" />}
+                {isPlaying ? (
+                  <Pause className="w-6 h-6 fill-current" aria-hidden="true" />
+                ) : (
+                  <Play
+                    className="w-6 h-6 fill-current ml-1"
+                    aria-hidden="true"
+                  />
+                )}
               </button>
             </div>
           </div>
-          
+
           <React.Suspense fallback={<WaveformSkeleton />}>
             <WaveformVisualizer
               audioUrl={audioUrl}
@@ -382,11 +567,11 @@ const App: React.FC = () => {
               }}
             />
           </React.Suspense>
-          
+
           {audioUrl && (
-            <audio 
-              ref={audioRef} 
-              src={audioUrl} 
+            <audio
+              ref={audioRef}
+              src={audioUrl}
               onTimeUpdate={() => {
                 const node = audioRef.current;
                 if (!node || !node.duration) return;
@@ -402,7 +587,10 @@ const App: React.FC = () => {
 
           {status === AnalysisStatus.ANALYZING && (
             <div className="mt-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg flex items-center gap-4 animate-pulse">
-              <Activity className="w-5 h-5 text-blue-400 animate-spin" aria-hidden="true" />
+              <Activity
+                className="w-5 h-5 text-blue-400 animate-spin"
+                aria-hidden="true"
+              />
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-blue-200">
                   {providerType === 'gemini'
@@ -431,7 +619,10 @@ const App: React.FC = () => {
           {error && (
             <div className="mt-6 p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
               <div className="flex items-center gap-3 text-red-200">
-                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" aria-hidden="true" />
+                <AlertCircle
+                  className="w-5 h-5 text-red-500 flex-shrink-0"
+                  aria-hidden="true"
+                />
                 <span className="text-sm flex-1">{error}</span>
               </div>
               <div className="flex gap-2 mt-3 ml-8">
@@ -466,7 +657,8 @@ const App: React.FC = () => {
             {blueprint.meta && (
               <div className="flex items-center gap-4 text-[10px] mono text-zinc-500 uppercase tracking-widest px-1">
                 <span>
-                  Engine: {blueprint.meta.provider === 'local'
+                  Engine:{' '}
+                  {blueprint.meta.provider === 'local'
                     ? 'Local DSP'
                     : blueprint.meta.provider === 'ollama'
                       ? 'Ollama + Local DSP'
@@ -477,25 +669,39 @@ const App: React.FC = () => {
                 {blueprint.meta.sampleRate > 0 && (
                   <>
                     <span className="text-zinc-700">|</span>
-                    <span>{blueprint.meta.sampleRate / 1000}kHz / {blueprint.meta.channels}ch</span>
+                    <span>
+                      {blueprint.meta.sampleRate / 1000}kHz /{' '}
+                      {blueprint.meta.channels}ch
+                    </span>
                   </>
                 )}
                 {blueprint.meta.duration > 0 && (
                   <>
                     <span className="text-zinc-700">|</span>
-                    <span>{Math.floor(blueprint.meta.duration / 60)}:{Math.floor(blueprint.meta.duration % 60).toString().padStart(2, '0')}</span>
+                    <span>
+                      {Math.floor(blueprint.meta.duration / 60)}:
+                      {Math.floor(blueprint.meta.duration % 60)
+                        .toString()
+                        .padStart(2, '0')}
+                    </span>
                   </>
                 )}
                 {blueprint.telemetry.bpmConfidence != null && (
                   <>
                     <span className="text-zinc-700">|</span>
-                    <span>BPM conf: {Math.round(blueprint.telemetry.bpmConfidence * 100)}%</span>
+                    <span>
+                      BPM conf:{' '}
+                      {Math.round(blueprint.telemetry.bpmConfidence * 100)}%
+                    </span>
                   </>
                 )}
                 {blueprint.telemetry.keyConfidence != null && (
                   <>
                     <span className="text-zinc-700">|</span>
-                    <span>Key conf: {Math.round(blueprint.telemetry.keyConfidence * 100)}%</span>
+                    <span>
+                      Key conf:{' '}
+                      {Math.round(blueprint.telemetry.keyConfidence * 100)}%
+                    </span>
                   </>
                 )}
               </div>
@@ -515,28 +721,71 @@ const App: React.FC = () => {
         )}
 
         {!blueprint && status === AnalysisStatus.IDLE && (
-          <div className="flex flex-col items-center justify-center py-24 text-center space-y-6">
-            <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center shadow-xl">
-              <Upload className="w-8 h-8 text-zinc-600" aria-hidden="true" />
+          <div
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`
+              relative flex flex-col items-center justify-center py-24 text-center space-y-6
+              border-2 border-dashed rounded-2xl transition-all duration-200
+              ${
+                isDragOver
+                  ? dragError
+                    ? 'border-red-500 bg-red-900/10'
+                    : 'border-blue-500 bg-blue-900/10 shadow-lg shadow-blue-500/20'
+                  : 'border-zinc-800 hover:border-zinc-700'
+              }
+            `}
+          >
+            <div className={`
+              w-20 h-20 bg-zinc-900 border rounded-2xl flex items-center justify-center shadow-xl transition-all
+              ${isDragOver ? (dragError ? 'border-red-500' : 'border-blue-500') : 'border-zinc-800'}
+            `}>
+              <Upload className={`
+                w-8 h-8 transition-colors
+                ${isDragOver ? (dragError ? 'text-red-400' : 'text-blue-400') : 'text-zinc-600'}
+              `} aria-hidden="true" />
             </div>
-            <div className="max-w-md">
-              <h2 className="text-xl font-bold text-zinc-200 mb-2">Ready to Deconstruct</h2>
+            
+            <div className="max-w-md space-y-4">
+              <h2 className="text-xl font-bold text-zinc-200 mb-2">
+                {isDragOver ? (dragError ? 'Invalid File' : 'Drop to Analyze') : 'Ready to Deconstruct'}
+              </h2>
               <p className="text-zinc-500 text-sm">
-                Upload an audio file to generate a complete Ableton Live 12 reconstruction blueprint.
-                {providerType === 'gemini'
-                  ? ' Our neural engine will map out every device and signal path.'
-                  : providerType === 'ollama'
-                    ? ' Core analysis runs locally; Ollama enhances the descriptive output when available.'
-                    : ' Analysis runs locally in your browser — no API key needed.'}
+                {isDragOver ? (
+                  dragError || 'Release to start analysis'
+                ) : (
+                  <>
+                    Drag and drop an audio file here, or click the button below to upload.
+                    {providerType === 'gemini'
+                      ? ' Our neural engine will map out every device and signal path.'
+                      : providerType === 'ollama'
+                        ? ' Core analysis runs locally; Ollama enhances the descriptive output when available.'
+                        : ' Analysis runs locally in your browser — no API key needed.'}
+                  </>
+                )}
               </p>
+              
+              {!isDragOver && (
+                <>
+                  <FileFormatBadges formats={SUPPORTED_FORMATS} />
+                  <p className="text-xs text-zinc-600">
+                    Maximum file size: {(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB
+                  </p>
+                </>
+              )}
             </div>
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
-              aria-label="Analyze track"
-            >
-              Analyze Track
-            </button>
+            
+            {!isDragOver && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none min-h-[44px]"
+                aria-label="Select audio file"
+              >
+                Select File
+              </button>
+            )}
           </div>
         )}
       </main>
@@ -545,14 +794,19 @@ const App: React.FC = () => {
       <footer className="fixed bottom-0 w-full bg-zinc-950/80 backdrop-blur-sm border-t border-zinc-900 py-3">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-[10px] mono text-zinc-600 uppercase tracking-widest">
           <span>Engine Status: Nominal</span>
-          <span className="hidden sm:inline">Active Engine: {providerLabel}</span>
+          <span className="hidden sm:inline">
+            Active Engine: {providerLabel}
+          </span>
           <span>© 2025 Sonic Architect</span>
         </div>
       </footer>
 
       {/* Click outside to close settings */}
       {showSettings && (
-        <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowSettings(false)}
+        />
       )}
     </div>
   );

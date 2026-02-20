@@ -13,11 +13,16 @@ import { DetectedNote, QuantizeGrid, QuantizeOptions } from '../types';
 function gridToSeconds(grid: QuantizeGrid, bpm: number): number {
   const beatDuration = 60 / bpm; // quarter note in seconds
   switch (grid) {
-    case '1/4':  return beatDuration;
-    case '1/8':  return beatDuration / 2;
-    case '1/16': return beatDuration / 4;
-    case '1/32': return beatDuration / 8;
-    case 'off':  return 0;
+    case '1/4':
+      return beatDuration;
+    case '1/8':
+      return beatDuration / 2;
+    case '1/16':
+      return beatDuration / 4;
+    case '1/32':
+      return beatDuration / 8;
+    case 'off':
+      return 0;
   }
 }
 
@@ -27,11 +32,7 @@ function gridToSeconds(grid: QuantizeGrid, bpm: number): number {
  * Swing shifts every *other* grid position forward by a percentage of the
  * grid interval. 0 = straight, 50 = triplet feel, 100 = dotted feel.
  */
-function snapToGrid(
-  time: number,
-  gridSize: number,
-  swing: number,
-): number {
+function snapToGrid(time: number, gridSize: number, swing: number): number {
   if (gridSize <= 0) return time;
 
   const gridIndex = Math.round(time / gridSize);
@@ -49,13 +50,13 @@ function snapToGrid(
 /**
  * Snap a duration to the nearest grid multiple (minimum = half a grid cell).
  */
-function snapDuration(
-  duration: number,
-  gridSize: number,
-): number {
+function snapDuration(duration: number, gridSize: number): number {
   if (gridSize <= 0) return duration;
   const minDuration = gridSize / 2;
-  const snapped = Math.max(minDuration, Math.round(duration / gridSize) * gridSize);
+  const snapped = Math.max(
+    minDuration,
+    Math.round(duration / gridSize) * gridSize
+  );
   return snapped;
 }
 
@@ -66,7 +67,7 @@ function snapDuration(
 export function quantizeNotes(
   notes: DetectedNote[],
   bpm: number,
-  options: QuantizeOptions,
+  options: QuantizeOptions
 ): DetectedNote[] {
   if (options.grid === 'off') return notes;
 
@@ -84,10 +85,15 @@ export function quantizeNotes(
  */
 export function gridLabel(grid: QuantizeGrid): string {
   switch (grid) {
-    case '1/4':  return '¼ note';
-    case '1/8':  return '⅛ note';
-    case '1/16': return '1/16 note';
-    case '1/32': return '1/32 note';
-    case 'off':  return 'Off';
+    case '1/4':
+      return '¼ note';
+    case '1/8':
+      return '⅛ note';
+    case '1/16':
+      return '1/16 note';
+    case '1/32':
+      return '1/32 note';
+    case 'off':
+      return 'Off';
   }
 }

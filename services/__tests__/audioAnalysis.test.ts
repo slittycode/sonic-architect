@@ -3,7 +3,7 @@ import { extractWaveformPeaks } from '../audioAnalysis';
 
 function createMockAudioBuffer(
   channels: Float32Array[],
-  sampleRate: number,
+  sampleRate: number
 ): AudioBuffer {
   const length = channels[0]?.length ?? 0;
   return {

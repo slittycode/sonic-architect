@@ -103,7 +103,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = React.memo(
         const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1);
         onSeek(ratio * duration);
       },
-      [audioUrl, duration, onSeek],
+      [audioUrl, duration, onSeek]
     );
 
     return (
@@ -119,7 +119,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = React.memo(
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/20 to-transparent pointer-events-none" />
       </div>
     );
-  },
+  }
 );
 
 export default WaveformVisualizer;

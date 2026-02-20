@@ -56,7 +56,7 @@ function parseEnhancement(raw: string): OllamaEnhancement | null {
 
 function mergeEnhancement(
   blueprint: ReconstructionBlueprint,
-  enhancement: OllamaEnhancement | null,
+  enhancement: OllamaEnhancement | null
 ): ReconstructionBlueprint {
   if (!enhancement) return blueprint;
 
@@ -76,13 +76,19 @@ function mergeEnhancement(
   if (Array.isArray(enhancement.instrumentation)) {
     for (const update of enhancement.instrumentation) {
       if (!update?.element) continue;
-      const index = merged.instrumentation.findIndex((item) => item.element === update.element);
+      const index = merged.instrumentation.findIndex(
+        (item) => item.element === update.element
+      );
       if (index === -1) continue;
       if (typeof update.timbre === 'string' && update.timbre.trim()) {
         merged.instrumentation[index].timbre = update.timbre.trim();
       }
-      if (typeof update.abletonDevice === 'string' && update.abletonDevice.trim()) {
-        merged.instrumentation[index].abletonDevice = update.abletonDevice.trim();
+      if (
+        typeof update.abletonDevice === 'string' &&
+        update.abletonDevice.trim()
+      ) {
+        merged.instrumentation[index].abletonDevice =
+          update.abletonDevice.trim();
       }
     }
   }
@@ -90,9 +96,14 @@ function mergeEnhancement(
   if (Array.isArray(enhancement.fxChain)) {
     for (const update of enhancement.fxChain) {
       if (!update?.artifact) continue;
-      const index = merged.fxChain.findIndex((item) => item.artifact === update.artifact);
+      const index = merged.fxChain.findIndex(
+        (item) => item.artifact === update.artifact
+      );
       if (index === -1) continue;
-      if (typeof update.recommendation === 'string' && update.recommendation.trim()) {
+      if (
+        typeof update.recommendation === 'string' &&
+        update.recommendation.trim()
+      ) {
         merged.fxChain[index].recommendation = update.recommendation.trim();
       }
     }
@@ -122,7 +133,7 @@ export class OllamaProvider implements AnalysisProvider {
 
   constructor(
     private readonly localProvider: LocalAnalysisProvider = new LocalAnalysisProvider(),
-    private readonly config: OllamaConfig = DEFAULT_OLLAMA_CONFIG,
+    private readonly config: OllamaConfig = DEFAULT_OLLAMA_CONFIG
   ) {}
 
   async isAvailable(): Promise<boolean> {
@@ -134,9 +145,12 @@ export class OllamaProvider implements AnalysisProvider {
     return this.analyzeAudioBuffer(audioBuffer);
   }
 
-  async analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<ReconstructionBlueprint> {
+  async analyzeAudioBuffer(
+    audioBuffer: AudioBuffer
+  ): Promise<ReconstructionBlueprint> {
     const startTime = performance.now();
-    const localBlueprint = await this.localProvider.analyzeAudioBuffer(audioBuffer);
+    const localBlueprint =
+      await this.localProvider.analyzeAudioBuffer(audioBuffer);
     const prompt = buildPrompt(localBlueprint);
 
     try {

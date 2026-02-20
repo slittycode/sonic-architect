@@ -7,11 +7,28 @@
  * 3. Return the key with highest correlation
  */
 
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const NOTE_NAMES = [
+  'C',
+  'C#',
+  'D',
+  'D#',
+  'E',
+  'F',
+  'F#',
+  'G',
+  'G#',
+  'A',
+  'A#',
+  'B',
+];
 
 // Krumhansl-Kessler key profiles (perceptual weightings)
-const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const MAJOR_PROFILE = [
+  6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
+];
+const MINOR_PROFILE = [
+  6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
+];
 
 /**
  * Compute chroma features from an AudioBuffer.
@@ -47,7 +64,7 @@ function computeChroma(audioBuffer: AudioBuffer): number[] {
         if (freq > sampleRate / 2 || freq < 50) continue;
 
         // Goertzel algorithm for single frequency detection
-        const k = Math.round(freq * frameSize / sampleRate);
+        const k = Math.round((freq * frameSize) / sampleRate);
         const w = (2 * Math.PI * k) / frameSize;
         const cosW = Math.cos(w);
         const coeff = 2 * cosW;

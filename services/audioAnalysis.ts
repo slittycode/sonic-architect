@@ -107,7 +107,7 @@ export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
  */
 export function extractWaveformPeaks(
   audioBuffer: AudioBuffer,
-  numBars: number = 320,
+  numBars: number = 320
 ): number[] {
   if (numBars <= 0) return [];
 
@@ -164,7 +164,10 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
   const estimatedFrames = Math.floor(availableSamples / BASE_HOP_SIZE) + 1;
   const hopSize =
     estimatedFrames > MAX_ANALYSIS_FRAMES
-      ? Math.max(BASE_HOP_SIZE, Math.floor(availableSamples / MAX_ANALYSIS_FRAMES))
+      ? Math.max(
+          BASE_HOP_SIZE,
+          Math.floor(availableSamples / MAX_ANALYSIS_FRAMES)
+        )
       : BASE_HOP_SIZE;
   const numFrames = Math.max(1, Math.floor(availableSamples / hopSize) + 1);
   const fftHalf = FRAME_SIZE / 2;
@@ -183,7 +186,7 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
     const lowBin = Math.floor((lowHz * FRAME_SIZE) / sampleRate);
     const highBin = Math.min(
       Math.ceil((highHz * FRAME_SIZE) / sampleRate),
-      fftHalf - 1,
+      fftHalf - 1
     );
     return [lowBin, highBin] as const;
   });
@@ -198,7 +201,10 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
   const spectrum = new Float32Array(fftHalf);
 
   for (let frame = 0; frame < numFrames; frame++) {
-    const start = Math.max(0, Math.min(frame * hopSize, analysisLength - FRAME_SIZE));
+    const start = Math.max(
+      0,
+      Math.min(frame * hopSize, analysisLength - FRAME_SIZE)
+    );
 
     // --- RMS ---
     let rmsSum = 0;
@@ -262,12 +268,12 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
 
   // --- Aggregate metrics ---
   const rmsMean = numFrames > 0 ? totalRms / numFrames : 0;
-  const spectralCentroidMean = spectralCentroidCount > 0
-    ? spectralCentroidAcc / spectralCentroidCount
-    : 0;
+  const spectralCentroidMean =
+    spectralCentroidCount > 0 ? spectralCentroidAcc / spectralCentroidCount : 0;
 
   // Crest factor: peak-to-RMS ratio in dB
-  const crestFactor = rmsMean > 0 ? 20 * Math.log10(peakAmplitude / rmsMean) : 0;
+  const crestFactor =
+    rmsMean > 0 ? 20 * Math.log10(peakAmplitude / rmsMean) : 0;
 
   // Onset density
   const onsetDensity = duration > 0 ? onsetCount / duration : 0;
@@ -275,9 +281,10 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
   // --- Spectral band energies ---
   const spectralBands: SpectralBandEnergy[] = SPECTRAL_BANDS.map((band, i) => {
     const energyArr = bandEnergies[i];
-    const avg = energyArr.length > 0
-      ? energyArr.reduce((a, b) => a + b, 0) / energyArr.length
-      : 0;
+    const avg =
+      energyArr.length > 0
+        ? energyArr.reduce((a, b) => a + b, 0) / energyArr.length
+        : 0;
     const peak = bandPeaks[i];
 
     const avgDb = avg > 0 ? 20 * Math.log10(avg) : -100;

@@ -15,7 +15,20 @@ const TICKS_PER_BEAT = 128;
  * Convert a MIDI note number to the pitch string midi-writer-js expects.
  * e.g. 60 → 'C4', 61 → 'C#4'
  */
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+const NOTE_NAMES = [
+  'C',
+  'C#',
+  'D',
+  'D#',
+  'E',
+  'F',
+  'F#',
+  'G',
+  'G#',
+  'A',
+  'A#',
+  'B',
+] as const;
 
 function midiToPitchString(midi: number): string {
   const clamped = Math.max(0, Math.min(127, Math.round(midi)));
@@ -41,7 +54,7 @@ function durationToTicks(durationSec: number, bpm: number): number {
 export function createMidiFile(
   notes: DetectedNote[],
   bpm: number = 120,
-  trackName: string = 'Sonic Architect — Session Musician',
+  trackName: string = 'Sonic Architect — Session Musician'
 ): Blob {
   const track = new MidiWriter.Track();
 
@@ -58,7 +71,10 @@ export function createMidiFile(
     const durTicks = durationToTicks(note.duration, bpm);
 
     // Velocity: midi-writer-js uses 1-100 scale
-    const velocity = Math.max(1, Math.min(100, Math.round((note.velocity / 127) * 100)));
+    const velocity = Math.max(
+      1,
+      Math.min(100, Math.round((note.velocity / 127) * 100))
+    );
 
     track.addEvent(
       new MidiWriter.NoteEvent({
@@ -66,7 +82,7 @@ export function createMidiFile(
         duration: `T${durTicks}`,
         velocity,
         startTick,
-      }),
+      })
     );
   }
 
@@ -82,7 +98,7 @@ export function createMidiFile(
 export function downloadMidiFile(
   notes: DetectedNote[],
   bpm: number,
-  fileName: string = 'session-musician.mid',
+  fileName: string = 'session-musician.mid'
 ): void {
   const blob = createMidiFile(notes, bpm);
   const url = URL.createObjectURL(blob);

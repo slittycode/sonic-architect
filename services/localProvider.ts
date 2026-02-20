@@ -18,6 +18,7 @@ import {
   getFXRecommendations,
   getSecretSauce,
 } from '../data/abletonDevices';
+import { detectChords } from './chordDetection';
 
 /**
  * Segment the RMS energy profile into arrangement sections.
@@ -28,7 +29,13 @@ function detectArrangement(
   duration: number
 ): ArrangementSection[] {
   if (rmsProfile.length === 0) {
-    return [{ timeRange: `0:00–${formatTime(duration)}`, label: 'Full Track', description: 'Unable to segment — audio too short.' }];
+    return [
+      {
+        timeRange: `0:00–${formatTime(duration)}`,
+        label: 'Full Track',
+        description: 'Unable to segment — audio too short.',
+      },
+    ];
   }
 
   // Smooth the RMS profile to reduce noise
@@ -37,7 +44,11 @@ function detectArrangement(
   for (let i = 0; i < rmsProfile.length; i++) {
     let sum = 0;
     let count = 0;
-    for (let j = Math.max(0, i - windowSize); j <= Math.min(rmsProfile.length - 1, i + windowSize); j++) {
+    for (
+      let j = Math.max(0, i - windowSize);
+      j <= Math.min(rmsProfile.length - 1, i + windowSize);
+      j++
+    ) {
       sum += rmsProfile[j];
       count++;
     }
@@ -46,7 +57,7 @@ function detectArrangement(
 
   // Normalize to 0-1
   const maxRms = Math.max(...smoothed);
-  const normalized = maxRms > 0 ? smoothed.map(v => v / maxRms) : smoothed;
+  const normalized = maxRms > 0 ? smoothed.map((v) => v / maxRms) : smoothed;
 
   // Find significant energy changes (change-point detection)
   const changePoints: number[] = [0]; // Always start at 0
@@ -102,11 +113,21 @@ function detectArrangement(
 
   // Label each section based on energy level
   const sections: ArrangementSection[] = [];
-  const sectionLabels = ['Intro', 'Build', 'Main', 'Chorus', 'Breakdown', 'Drop', 'Bridge', 'Outro'];
+  const sectionLabels = [
+    'Intro',
+    'Build',
+    'Main',
+    'Chorus',
+    'Breakdown',
+    'Drop',
+    'Bridge',
+    'Outro',
+  ];
 
   for (let i = 0; i < changePoints.length; i++) {
     const startFrame = changePoints[i];
-    const endFrame = i < changePoints.length - 1 ? changePoints[i + 1] : rmsProfile.length;
+    const endFrame =
+      i < changePoints.length - 1 ? changePoints[i + 1] : rmsProfile.length;
 
     const startTime = (startFrame / rmsProfile.length) * duration;
     const endTime = (endFrame / rmsProfile.length) * duration;
@@ -136,13 +157,14 @@ function detectArrangement(
     }
 
     // Energy description
-    const energyDesc = sectionEnergy > 0.75
-      ? 'High energy — full arrangement, all elements active.'
-      : sectionEnergy > 0.5
-        ? 'Medium-high energy — core elements present, building momentum.'
-        : sectionEnergy > 0.3
-          ? 'Medium energy — reduced arrangement, focus on key elements.'
-          : 'Low energy — sparse arrangement, atmospheric or transitional.';
+    const energyDesc =
+      sectionEnergy > 0.75
+        ? 'High energy — full arrangement, all elements active.'
+        : sectionEnergy > 0.5
+          ? 'Medium-high energy — core elements present, building momentum.'
+          : sectionEnergy > 0.3
+            ? 'Medium energy — reduced arrangement, focus on key elements.'
+            : 'Low energy — sparse arrangement, atmospheric or transitional.';
 
     sections.push({
       timeRange: `${formatTime(startTime)}–${formatTime(endTime)}`,
@@ -171,7 +193,11 @@ function formatTime(seconds: number): string {
 /**
  * Describe groove from onset density and BPM
  */
-function describeGroove(features: { onsetDensity: number; bpm: number; crestFactor: number }): string {
+function describeGroove(features: {
+  onsetDensity: number;
+  bpm: number;
+  crestFactor: number;
+}): string {
   const { onsetDensity, bpm, crestFactor } = features;
 
   let groove = '';
@@ -185,7 +211,8 @@ function describeGroove(features: { onsetDensity: number; bpm: number; crestFact
   else if (onsetDensity > 4) groove += ' with moderate rhythmic complexity';
   else groove += ' with sparse, minimal hits';
 
-  if (crestFactor < 6) groove += '. Heavily compressed dynamics — punchy and in-your-face.';
+  if (crestFactor < 6)
+    groove += '. Heavily compressed dynamics — punchy and in-your-face.';
   else if (crestFactor < 12) groove += '. Balanced dynamics with punch.';
   else groove += '. Wide dynamic range — natural, uncompressed feel.';
 
@@ -196,11 +223,33 @@ export function buildLocalBlueprint(
   features: AudioFeatures,
   analysisTime: number,
   provider: 'local' | 'ollama' = 'local',
+  audioBuffer?: AudioBuffer
 ): ReconstructionBlueprint {
   const arrangement = detectArrangement(features.rmsProfile, features.duration);
   const instrumentation = getInstrumentRecommendations(features.spectralBands);
   const fxChain = getFXRecommendations(features);
   const secretSauce = getSecretSauce(features);
+
+  // Chord detection (runs if AudioBuffer is provided)
+  let chordProgression;
+  let chordProgressionSummary;
+  if (audioBuffer) {
+    try {
+      const chordResult = detectChords(audioBuffer);
+      if (chordResult.chords.length > 0) {
+        chordProgression = chordResult.chords.map((c) => ({
+          timeRange: c.timeRange,
+          chord: c.chord,
+          root: c.root,
+          quality: c.quality,
+          confidence: c.confidence,
+        }));
+        chordProgressionSummary = chordResult.progression;
+      }
+    } catch {
+      // Chord detection is non-critical — continue without it
+    }
+  }
 
   return {
     telemetry: {
@@ -211,11 +260,19 @@ export function buildLocalBlueprint(
       keyConfidence: features.key.confidence,
     },
     arrangement,
+    chordProgression,
+    chordProgressionSummary,
     instrumentation,
-    fxChain: fxChain.length > 0 ? fxChain : [{
-      artifact: 'Balanced dynamics and spectrum',
-      recommendation: 'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
-    }],
+    fxChain:
+      fxChain.length > 0
+        ? fxChain
+        : [
+            {
+              artifact: 'Balanced dynamics and spectrum',
+              recommendation:
+                'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
+            },
+          ],
     secretSauce,
     meta: {
       provider,
@@ -241,12 +298,14 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     return this.analyzeAudioBuffer(audioBuffer);
   }
 
-  async analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<ReconstructionBlueprint> {
+  async analyzeAudioBuffer(
+    audioBuffer: AudioBuffer
+  ): Promise<ReconstructionBlueprint> {
     const startTime = performance.now();
 
     // Extract features
     const features = extractAudioFeatures(audioBuffer);
     const analysisTime = Math.round(performance.now() - startTime);
-    return buildLocalBlueprint(features, analysisTime, 'local');
+    return buildLocalBlueprint(features, analysisTime, 'local', audioBuffer);
   }
 }

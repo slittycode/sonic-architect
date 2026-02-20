@@ -5,7 +5,9 @@ describe('validateBlueprint', () => {
   it('accepts a valid reconstruction blueprint payload', () => {
     const valid = validateBlueprint({
       telemetry: { bpm: '128', key: 'F Minor', groove: 'steady' },
-      arrangement: [{ timeRange: '0:00-0:20', label: 'Intro', description: 'Start' }],
+      arrangement: [
+        { timeRange: '0:00-0:20', label: 'Intro', description: 'Start' },
+      ],
       instrumentation: [
         {
           element: 'Bass',
@@ -26,7 +28,7 @@ describe('validateBlueprint', () => {
     expect(() =>
       validateBlueprint({
         telemetry: { bpm: '128' },
-      }),
+      })
     ).toThrowError(/invalid blueprint/i);
   });
 });

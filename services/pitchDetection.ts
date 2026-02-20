@@ -39,7 +39,20 @@ const PITCH_CHANGE_THRESHOLD = 0.5;
 
 // ── Note name helpers ──────────────────────────────────────────────────────────
 
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+const NOTE_NAMES = [
+  'C',
+  'C#',
+  'D',
+  'D#',
+  'E',
+  'F',
+  'F#',
+  'G',
+  'G#',
+  'A',
+  'A#',
+  'B',
+] as const;
 
 export function getFrameDurationSeconds(sampleRate: number): number {
   if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
@@ -67,7 +80,7 @@ function midiToNoteName(midi: number): string {
  */
 function yinDetectPitch(
   samples: Float32Array,
-  sampleRate: number,
+  sampleRate: number
 ): { frequency: number; confidence: number } {
   const halfWindow = Math.floor(samples.length / 2);
 
@@ -90,7 +103,10 @@ function yinDetectPitch(
 
   // Step 3: Absolute threshold — find first dip below threshold
   const minTau = Math.max(2, Math.floor(sampleRate / MAX_FREQUENCY));
-  const maxTau = Math.min(halfWindow - 1, Math.floor(sampleRate / MIN_FREQUENCY));
+  const maxTau = Math.min(
+    halfWindow - 1,
+    Math.floor(sampleRate / MIN_FREQUENCY)
+  );
 
   let bestTau = -1;
 
@@ -139,7 +155,11 @@ function detectFrames(audioBuffer: AudioBuffer): RawDetection[] {
 
   const detections: RawDetection[] = [];
 
-  for (let offset = 0; offset + WINDOW_SIZE <= totalSamples; offset += HOP_SIZE) {
+  for (
+    let offset = 0;
+    offset + WINDOW_SIZE <= totalSamples;
+    offset += HOP_SIZE
+  ) {
     const frame = channelData.slice(offset, offset + WINDOW_SIZE);
 
     // RMS for this frame → velocity / silence gate
@@ -178,7 +198,7 @@ function detectFrames(audioBuffer: AudioBuffer): RawDetection[] {
 function segmentNotes(
   detections: RawDetection[],
   maxRms: number,
-  sampleRate: number,
+  sampleRate: number
 ): DetectedNote[] {
   if (detections.length === 0) return [];
 
@@ -204,13 +224,16 @@ function segmentNotes(
       frameCount++;
     } else {
       // Finalize previous note
-      const duration = noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
+      const duration =
+        noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
       if (duration >= MIN_NOTE_DURATION) {
         const roundedMidi = Math.round(
-          (detections.slice(
-            detections.indexOf(noteStart),
-            detections.indexOf(noteEnd) + 1,
-          ).reduce((s, d) => s + d.midi, 0)) / frameCount,
+          detections
+            .slice(
+              detections.indexOf(noteStart),
+              detections.indexOf(noteEnd) + 1
+            )
+            .reduce((s, d) => s + d.midi, 0) / frameCount
         );
         notes.push({
           midi: Math.max(0, Math.min(127, roundedMidi)),
@@ -218,7 +241,10 @@ function segmentNotes(
           frequency: noteStart.frequency,
           startTime: noteStart.time,
           duration,
-          velocity: Math.max(1, Math.min(127, Math.round((peakRms / (maxRms || 1)) * 127))),
+          velocity: Math.max(
+            1,
+            Math.min(127, Math.round((peakRms / (maxRms || 1)) * 127))
+          ),
           confidence: confidenceSum / frameCount,
         });
       }
@@ -233,13 +259,13 @@ function segmentNotes(
   }
 
   // Finalize last note
-  const duration = noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
+  const duration =
+    noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
   if (duration >= MIN_NOTE_DURATION) {
     const roundedMidi = Math.round(
-      (detections.slice(
-        detections.indexOf(noteStart),
-        detections.indexOf(noteEnd) + 1,
-      ).reduce((s, d) => s + d.midi, 0)) / frameCount,
+      detections
+        .slice(detections.indexOf(noteStart), detections.indexOf(noteEnd) + 1)
+        .reduce((s, d) => s + d.midi, 0) / frameCount
     );
     notes.push({
       midi: Math.max(0, Math.min(127, roundedMidi)),
@@ -247,7 +273,10 @@ function segmentNotes(
       frequency: noteStart.frequency,
       startTime: noteStart.time,
       duration,
-      velocity: Math.max(1, Math.min(127, Math.round((peakRms / (maxRms || 1)) * 127))),
+      velocity: Math.max(
+        1,
+        Math.min(127, Math.round((peakRms / (maxRms || 1)) * 127))
+      ),
       confidence: confidenceSum / frameCount,
     });
   }
@@ -265,7 +294,7 @@ function segmentNotes(
  */
 export async function detectPitches(
   audioBuffer: AudioBuffer,
-  bpm: number = 120,
+  bpm: number = 120
 ): Promise<PitchDetectionResult> {
   // Run frame-level YIN detection
   const detections = detectFrames(audioBuffer);

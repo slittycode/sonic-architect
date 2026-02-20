@@ -37,7 +37,7 @@ export interface PreviewHandle {
 export function previewNotes(
   notes: DetectedNote[],
   _bpm: number = 120,
-  onEnd?: () => void,
+  onEnd?: () => void
 ): PreviewHandle {
   const ctx = new AudioContext();
   const masterGain = ctx.createGain();

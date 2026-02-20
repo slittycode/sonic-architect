@@ -5,7 +5,13 @@
  * a MIDI preview player, and a download button.
  */
 
-import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+} from 'react';
 import {
   Music2,
   Download,
@@ -50,19 +56,19 @@ const GRID_OPTIONS: QuantizeGrid[] = ['off', '1/4', '1/8', '1/16', '1/32'];
 const PIANO_ROLL_HEIGHT = 240;
 const KEY_WIDTH = 40;
 const NOTE_COLORS = {
-  fill: '#3b82f6',      // blue-500
-  fillHigh: '#60a5fa',  // blue-400 (high confidence)
-  fillLow: '#1e3a5f',   // muted blue (low confidence)
-  stroke: '#1d4ed8',    // blue-700
-  grid: '#27272a',       // zinc-800
-  text: '#a1a1aa',       // zinc-400
-  bg: '#09090b',         // zinc-950
+  fill: '#3b82f6', // blue-500
+  fillHigh: '#60a5fa', // blue-400 (high confidence)
+  fillLow: '#1e3a5f', // muted blue (low confidence)
+  stroke: '#1d4ed8', // blue-700
+  grid: '#27272a', // zinc-800
+  text: '#a1a1aa', // zinc-400
+  bg: '#09090b', // zinc-950
 };
 
 function drawPianoRoll(
   canvas: HTMLCanvasElement,
   notes: DetectedNote[],
-  duration: number,
+  duration: number
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -101,7 +107,20 @@ function drawPianoRoll(
   // Draw horizontal grid lines and piano key labels
   ctx.font = '9px ui-monospace, monospace';
   ctx.textAlign = 'right';
-  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const NOTE_NAMES = [
+    'C',
+    'C#',
+    'D',
+    'D#',
+    'E',
+    'F',
+    'F#',
+    'G',
+    'G#',
+    'A',
+    'A#',
+    'B',
+  ];
   for (let midi = minMidi; midi <= maxMidi; midi++) {
     const y = h - ((midi - minMidi) / range) * h;
     const isBlackKey = [1, 3, 6, 8, 10].includes(midi % 12);
@@ -242,14 +261,31 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
     const midiValues = displayNotes.map((n) => n.midi);
     const minNote = Math.min(...midiValues);
     const maxNote = Math.max(...midiValues);
-    const avgConf = displayNotes.reduce((s, n) => s + n.confidence, 0) / displayNotes.length;
-    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const toName = (m: number) => `${NOTE_NAMES[m % 12]}${Math.floor(m / 12) - 1}`;
+    const avgConf =
+      displayNotes.reduce((s, n) => s + n.confidence, 0) / displayNotes.length;
+    const NOTE_NAMES = [
+      'C',
+      'C#',
+      'D',
+      'D#',
+      'E',
+      'F',
+      'F#',
+      'G',
+      'G#',
+      'A',
+      'A#',
+      'B',
+    ];
+    const toName = (m: number) =>
+      `${NOTE_NAMES[m % 12]}${Math.floor(m / 12) - 1}`;
     return {
       count: displayNotes.length,
       range: `${toName(minNote)} — ${toName(maxNote)}`,
       avgConfidence: Math.round(avgConf * 100),
-      totalDuration: displayNotes.reduce((s, n) => s + n.duration, 0).toFixed(1),
+      totalDuration: displayNotes
+        .reduce((s, n) => s + n.duration, 0)
+        .toFixed(1),
     };
   }, [displayNotes]);
 
@@ -262,13 +298,19 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="p-2 bg-zinc-800 rounded-full">
             <Music2 className="w-5 h-5 text-violet-400" aria-hidden="true" />
           </div>
-          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">Session Musician</h2>
+          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">
+            Session Musician
+          </h2>
         </div>
         <div className="flex items-center gap-4 p-4 bg-violet-900/20 border border-violet-800/50 rounded-lg animate-pulse">
           <Loader2 className="w-5 h-5 text-violet-400 animate-spin" />
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-violet-200">Detecting pitches…</span>
-            <span className="text-xs text-violet-400/80">Running YIN autocorrelation on audio frames</span>
+            <span className="text-sm font-semibold text-violet-200">
+              Detecting pitches…
+            </span>
+            <span className="text-xs text-violet-400/80">
+              Running YIN autocorrelation on audio frames
+            </span>
           </div>
         </div>
       </section>
@@ -284,7 +326,9 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="p-2 bg-zinc-800 rounded-full">
             <Music2 className="w-5 h-5 text-violet-400" aria-hidden="true" />
           </div>
-          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">Session Musician</h2>
+          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">
+            Session Musician
+          </h2>
         </div>
         <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg text-sm text-red-200">
           {error}
@@ -308,8 +352,12 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
             <Music2 className="w-5 h-5 text-violet-400" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">Session Musician</h2>
-            <p className="text-[10px] text-zinc-500 mono tracking-widest uppercase">Audio → MIDI Transcription</p>
+            <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">
+              Session Musician
+            </h2>
+            <p className="text-[10px] text-zinc-500 mono tracking-widest uppercase">
+              Audio → MIDI Transcription
+            </p>
           </div>
         </div>
 
@@ -346,7 +394,11 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
             className="p-1.5 text-zinc-500 hover:text-zinc-300 transition-colors"
             title={expanded ? 'Collapse' : 'Expand'}
           >
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {expanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
@@ -379,7 +431,9 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="flex items-center gap-6 p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg">
             <div className="flex items-center gap-2">
               <Grid3X3 className="w-3.5 h-3.5 text-zinc-500" />
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Quantize</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                Quantize
+              </span>
             </div>
 
             {/* Grid selector */}
@@ -387,7 +441,9 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
               {GRID_OPTIONS.map((grid) => (
                 <button
                   key={grid}
-                  onClick={() => setQuantizeOptions((prev) => ({ ...prev, grid }))}
+                  onClick={() =>
+                    setQuantizeOptions((prev) => ({ ...prev, grid }))
+                  }
                   className={`px-2.5 py-1 text-xs rounded transition-all ${
                     quantizeOptions.grid === grid
                       ? 'bg-violet-700/50 text-violet-200 border border-violet-600/50'
@@ -427,8 +483,9 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="flex items-start gap-2 mt-3 text-[10px] text-zinc-600">
             <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
             <span>
-              Monophonic pitch detection via YIN autocorrelation. Best results with clean, single-instrument stems.
-              Adjust quantization to snap notes to the rhythmic grid before downloading.
+              Monophonic pitch detection via YIN autocorrelation. Best results
+              with clean, single-instrument stems. Adjust quantization to snap
+              notes to the rhythmic grid before downloading.
             </span>
           </div>
         </>

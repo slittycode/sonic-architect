@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Activity,
   Clock,
@@ -8,8 +8,10 @@ import {
   Zap,
   Sparkles,
   Download,
+  Music,
 } from 'lucide-react';
 import { ReconstructionBlueprint } from '../types';
+import BlueprintNavigation from './BlueprintNavigation';
 
 interface BlueprintDisplayProps {
   blueprint: ReconstructionBlueprint;
@@ -32,6 +34,26 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({
   blueprint,
   filename,
 }) => {
+  const telemetryRef = useRef<HTMLDivElement>(null);
+  const arrangementRef = useRef<HTMLDivElement>(null);
+  const instrumentsRef = useRef<HTMLDivElement>(null);
+  const fxRef = useRef<HTMLDivElement>(null);
+  const secretSauceRef = useRef<HTMLDivElement>(null);
+
+  const handleNavigate = (sectionId: string) => {
+    const refs: Record<string, React.RefObject<HTMLDivElement>> = {
+      'telemetry': telemetryRef,
+      'arrangement': arrangementRef,
+      'instruments': instrumentsRef,
+      'fx': fxRef,
+      'secret-sauce': secretSauceRef,
+    };
+
+    const targetRef = refs[sectionId];
+    if (targetRef?.current) {
+      targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
   const handleDownloadBlueprint = () => {
     const originalFilename = filename?.trim() || 'blueprint';
     const baseFilename = originalFilename.replace(/\.[^/.]+$/, '') || 'blueprint';
@@ -60,6 +82,8 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({
 
   return (
     <div className="space-y-4">
+      <BlueprintNavigation onNavigate={handleNavigate} />
+      
       <div className="flex justify-end">
         <button
           type="button"
@@ -74,7 +98,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({
       {/* Left Column: Telemetry & Arrangement */}
       <div className="lg:col-span-1 space-y-8">
         {/* Telemetry */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+        <div ref={telemetryRef} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg scroll-mt-24">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
             <Activity className="w-4 h-4 text-blue-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
@@ -89,7 +113,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({
         </div>
 
         {/* Timeline */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+        <div ref={arrangementRef} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg scroll-mt-24">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
             <Clock className="w-4 h-4 text-purple-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
@@ -117,11 +141,59 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({
             ))}
           </div>
         </div>
+
+        {/* Chord Progression */}
+        {blueprint.chordProgression && blueprint.chordProgression.length > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg scroll-mt-24">
+            <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+              <Music className="w-4 h-4 text-amber-400" aria-hidden="true" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                Chord Progression
+              </h3>
+            </div>
+            {blueprint.chordProgressionSummary && (
+              <div className="px-5 pt-4 pb-2">
+                <p className="text-sm font-semibold text-amber-300 mono tracking-wide">
+                  {blueprint.chordProgressionSummary}
+                </p>
+              </div>
+            )}
+            <div className="p-0">
+              {blueprint.chordProgression.map((chord, idx) => (
+                <div
+                  key={idx}
+                  className="px-5 py-3 border-b border-zinc-800 last:border-0 hover:bg-zinc-800/30 transition-colors flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] mono text-amber-400 bg-amber-400/10 px-1.5 rounded">
+                      {chord.timeRange}
+                    </span>
+                    <span className="text-sm font-bold text-zinc-100">
+                      {chord.chord}
+                    </span>
+                    <span className="text-[10px] text-zinc-500">
+                      {chord.quality}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div
+                      className="h-1.5 rounded-full bg-amber-400/80"
+                      style={{ width: `${Math.round(chord.confidence * 40)}px` }}
+                    />
+                    <span className="text-[9px] mono text-zinc-600">
+                      {Math.round(chord.confidence * 100)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Middle Column: The Rack (Instruments) */}
       <div className="lg:col-span-1 space-y-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+        <div ref={instrumentsRef} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg scroll-mt-24">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
@@ -176,7 +248,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({
       {/* Right Column: Effects & Secret Sauce */}
       <div className="lg:col-span-1 space-y-8">
         {/* FX Chain */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+        <div ref={fxRef} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg scroll-mt-24">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
             <Settings2 className="w-4 h-4 text-orange-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
@@ -214,7 +286,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({
         </div>
 
         {/* Secret Sauce */}
-        <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border border-indigo-500/30 rounded-xl overflow-hidden shadow-xl">
+        <div ref={secretSauceRef} className="bg-gradient-to-br from-indigo-900/30 to-purple-900/20 border border-indigo-500/30 rounded-xl overflow-hidden shadow-xl scroll-mt-24">
           <div className="px-4 py-3 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-yellow-400" aria-hidden="true" />
             <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300">
