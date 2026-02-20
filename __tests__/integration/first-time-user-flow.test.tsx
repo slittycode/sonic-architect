@@ -1,6 +1,6 @@
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const { fixtureBlueprint, fakeAudioBuffer } = vi.hoisted(() => {
   const fixtureBlueprintValue = {
@@ -109,29 +109,28 @@ vi.mock('../../services/pitchDetection', () => ({
 
 import App from '../../App';
 
-describe('First-time user flow integration', () => {
+describe('App integration flow', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
   });
-
-  it('shows expanded hero on first visit', () => {
-    render(<App />);
-
-    // Hero should be expanded
-    expect(screen.getByText(/Deconstruct Any Track into an/i)).toBeInTheDocument();
-    expect(screen.getByText(/Local Analysis/i)).toBeInTheDocument();
-    expect(screen.getByText(/MIDI Transcription/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /get started/i })).toBeInTheDocument();
+  
+  afterEach(() => {
+    cleanup();
   });
 
-  it('collapses hero after first successful analysis', async () => {
+  it('renders idle upload state on first visit', () => {
+    render(<App />);
+
+    expect(screen.getByRole('heading', { level: 1, name: /Sonic Architect/i })).toBeInTheDocument();
+    expect(screen.getByText(/Ready to Deconstruct/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /analyze track/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /import audio stem/i })).toBeInTheDocument();
+  });
+
+  it('runs local analysis after file upload', async () => {
     const { container } = render(<App />);
 
-    // Verify hero is expanded initially
-    expect(screen.getByText(/Local Analysis/i)).toBeInTheDocument();
-
-    // Upload a file
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).not.toBeNull();
 
@@ -140,24 +139,18 @@ describe('First-time user flow integration', () => {
     });
     fireEvent.change(fileInput, { target: { files: [file] } });
 
-    // Wait for analysis to complete
     await waitFor(
       () => {
-        expect(screen.getByText(/Engine: Local DSP/i)).toBeInTheDocument();
+        expect(screen.getByText(/^Engine:\s+Local DSP$/i)).toBeInTheDocument();
       },
       { timeout: 3000 }
     );
 
-    // Hero should now be minimized (feature highlights not visible)
-    expect(screen.queryByText(/Local Analysis/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /get started/i })).not.toBeInTheDocument();
-
-    // But minimized version should still show
-    expect(screen.getByText(/Deconstruct Any Track into an Ableton Live Blueprint/i)).toBeInTheDocument();
+    expect(screen.getByText(/Analyzed in 120ms/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Ready to Deconstruct/i)).not.toBeInTheDocument();
   });
 
-  it('shows minimized hero on subsequent visits', () => {
-    // Simulate returning user
+  it('ignores legacy first-time-user storage key', () => {
     localStorage.setItem(
       'sonic-architect-first-time',
       JSON.stringify({
@@ -169,67 +162,24 @@ describe('First-time user flow integration', () => {
 
     render(<App />);
 
-    // Hero should be minimized
-    expect(screen.queryByText(/Local Analysis/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /get started/i })).not.toBeInTheDocument();
-
-    // Minimized version should show
-    expect(screen.getByText(/Deconstruct Any Track into an Ableton Live Blueprint/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ready to Deconstruct/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /analyze track/i })).toBeInTheDocument();
   });
 
-  it('persists first-time user state in localStorage', async () => {
-    const { container } = render(<App />);
+  it('hydrates provider preference from localStorage', () => {
+    localStorage.setItem('sonic-architect-provider', 'ollama');
 
-    // Verify localStorage is initially empty or default
-    const initialState = localStorage.getItem('sonic-architect-first-time');
-    if (initialState) {
-      const parsed = JSON.parse(initialState);
-      expect(parsed.hasCompletedAnalysis).toBe(false);
-    }
-
-    // Upload and analyze
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File([new Uint8Array([1, 2, 3])], 'test.wav', {
-      type: 'audio/wav',
-    });
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    // Wait for analysis to complete
-    await waitFor(
-      () => {
-        expect(screen.getByText(/Engine: Local DSP/i)).toBeInTheDocument();
-      },
-      { timeout: 3000 }
-    );
-
-    // Verify localStorage was updated
-    const storedState = localStorage.getItem('sonic-architect-first-time');
-    expect(storedState).not.toBeNull();
-
-    const parsed = JSON.parse(storedState!);
-    expect(parsed.hasCompletedAnalysis).toBe(true);
-    expect(parsed.analysisCount).toBeGreaterThan(0);
-    expect(parsed.firstAnalysisDate).not.toBeNull();
+    render(<App />);
+    expect(screen.getByText('Ollama + Local DSP')).toBeInTheDocument();
   });
 
-  it('can toggle hero between expanded and minimized states', () => {
+  it('persists provider preference when user changes engine', () => {
     render(<App />);
 
-    // Initially expanded
-    expect(screen.getByText(/Local Analysis/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/analysis engine settings/i));
+    fireEvent.click(screen.getByText('Gemini 1.5 Pro'));
 
-    // Click minimize
-    const minimizeButton = screen.getByLabelText(/minimize hero section/i);
-    fireEvent.click(minimizeButton);
-
-    // Should be minimized
-    expect(screen.queryByText(/Local Analysis/i)).not.toBeInTheDocument();
-
-    // Click expand
-    const expandButton = screen.getByLabelText(/expand hero section/i);
-    fireEvent.click(expandButton);
-
-    // Should be expanded again
-    expect(screen.getByText(/Local Analysis/i)).toBeInTheDocument();
+    expect(localStorage.getItem('sonic-architect-provider')).toBe('gemini');
+    expect(screen.getByText('Gemini 1.5 Pro')).toBeInTheDocument();
   });
 });

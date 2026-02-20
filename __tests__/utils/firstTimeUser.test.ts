@@ -109,8 +109,12 @@ describe('firstTimeUser utilities', () => {
       
       // Verify timestamp is recent
       const afterTime = new Date().toISOString();
-      expect(state.firstAnalysisDate!).toBeGreaterThanOrEqual(beforeTime);
-      expect(state.firstAnalysisDate!).toBeLessThanOrEqual(afterTime);
+      expect(new Date(state.firstAnalysisDate!).getTime()).toBeGreaterThanOrEqual(
+        new Date(beforeTime).getTime()
+      );
+      expect(new Date(state.firstAnalysisDate!).getTime()).toBeLessThanOrEqual(
+        new Date(afterTime).getTime()
+      );
     });
 
     it('increments analysis count on subsequent calls', () => {
