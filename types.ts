@@ -38,12 +38,22 @@ export interface AnalysisMeta {
   channels: number;
 }
 
+export interface ChordSegment {
+  timeRange: string;
+  chord: string;
+  root: string;
+  quality: string;
+  confidence: number;
+}
+
 export interface ReconstructionBlueprint {
   telemetry: GlobalTelemetry;
   arrangement: ArrangementSection[];
   instrumentation: InstrumentRackElement[];
   fxChain: FXChainItem[];
   secretSauce: SecretSauce;
+  chordProgression?: ChordSegment[];
+  chordProgressionSummary?: string;
   meta?: AnalysisMeta;
 }
 
