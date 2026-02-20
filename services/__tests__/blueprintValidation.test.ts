@@ -22,6 +22,65 @@ describe('validateBlueprint', () => {
     expect(valid.arrangement).toHaveLength(1);
   });
 
+  it('accepts optional chord progression fields with valid chord segments', () => {
+    const valid = validateBlueprint({
+      telemetry: { bpm: '128', key: 'F Minor', groove: 'steady' },
+      arrangement: [{ timeRange: '0:00-0:20', label: 'Intro', description: 'Start' }],
+      instrumentation: [
+        {
+          element: 'Bass',
+          timbre: 'Warm',
+          frequency: '40-120Hz',
+          abletonDevice: 'Operator',
+        },
+      ],
+      fxChain: [{ artifact: 'Compression', recommendation: 'Glue Compressor' }],
+      secretSauce: { trick: 'Saturation', execution: 'Subtle drive' },
+      chordProgression: [
+        {
+          timeRange: '0:00-0:08',
+          chord: 'Am',
+          root: 'A',
+          quality: 'Minor',
+          confidence: 0.82,
+        },
+      ],
+      chordProgressionSummary: 'Am – F – C – G',
+    });
+
+    expect(valid.chordProgression).toHaveLength(1);
+    expect(valid.chordProgression?.[0]?.chord).toBe('Am');
+    expect(valid.chordProgressionSummary).toBe('Am – F – C – G');
+  });
+
+  it('rejects chord progression confidence outside 0-1', () => {
+    expect(() =>
+      validateBlueprint({
+        telemetry: { bpm: '128', key: 'F Minor', groove: 'steady' },
+        arrangement: [{ timeRange: '0:00-0:20', label: 'Intro', description: 'Start' }],
+        instrumentation: [
+          {
+            element: 'Bass',
+            timbre: 'Warm',
+            frequency: '40-120Hz',
+            abletonDevice: 'Operator',
+          },
+        ],
+        fxChain: [{ artifact: 'Compression', recommendation: 'Glue Compressor' }],
+        secretSauce: { trick: 'Saturation', execution: 'Subtle drive' },
+        chordProgression: [
+          {
+            timeRange: '0:00-0:08',
+            chord: 'Am',
+            root: 'A',
+            quality: 'Minor',
+            confidence: 1.2,
+          },
+        ],
+      }),
+    ).toThrowError(/chordProgression\[0\]\.confidence/i);
+  });
+
   it('rejects invalid shapes that would break rendering', () => {
     expect(() =>
       validateBlueprint({

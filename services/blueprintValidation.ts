@@ -35,6 +35,23 @@ function optionalNumber(
   return value;
 }
 
+function requireNumberInRange(
+  value: unknown,
+  path: string,
+  min: number,
+  max: number,
+): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new Error(`Invalid blueprint at ${path}: expected number`);
+  }
+  if (value < min || value > max) {
+    throw new Error(
+      `Invalid blueprint at ${path}: expected number between ${min} and ${max}`,
+    );
+  }
+  return value;
+}
+
 function requireArray(
   value: unknown,
   path: string,
@@ -116,12 +133,50 @@ export function validateBlueprint(data: unknown): ReconstructionBlueprint {
     };
   }
 
+  let chordProgression: ReconstructionBlueprint['chordProgression'];
+  if (root.chordProgression != null) {
+    chordProgression = requireArray(
+      root.chordProgression,
+      'chordProgression',
+    ).map((entry, index) => {
+      const row = requireRecord(entry, `chordProgression[${index}]`);
+      return {
+        timeRange: requireString(
+          row.timeRange,
+          `chordProgression[${index}].timeRange`,
+        ),
+        chord: requireString(row.chord, `chordProgression[${index}].chord`),
+        root: requireString(row.root, `chordProgression[${index}].root`),
+        quality: requireString(
+          row.quality,
+          `chordProgression[${index}].quality`,
+        ),
+        confidence: requireNumberInRange(
+          row.confidence,
+          `chordProgression[${index}].confidence`,
+          0,
+          1,
+        ),
+      };
+    });
+  }
+
+  let chordProgressionSummary: ReconstructionBlueprint['chordProgressionSummary'];
+  if (root.chordProgressionSummary != null) {
+    chordProgressionSummary = requireString(
+      root.chordProgressionSummary,
+      'chordProgressionSummary',
+    );
+  }
+
   return {
     telemetry,
     arrangement,
     instrumentation,
     fxChain,
     secretSauce,
+    chordProgression,
+    chordProgressionSummary,
     meta,
   };
 }
