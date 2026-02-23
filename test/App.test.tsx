@@ -11,21 +11,21 @@ describe('App', () => {
 
   it('shows file size error when uploading a file that exceeds limit', async () => {
     render(<App />);
-    const fileInput = document.querySelector('input[type="file"]');
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
 
     const oversizedFile = new File(['x'], 'big.mp3', { type: 'audio/mpeg' });
-    Object.defineProperty(oversizedFile, 'size', { value: 11 * 1024 * 1024 });
+    Object.defineProperty(oversizedFile, 'size', { value: 101 * 1024 * 1024 });
 
-    await userEvent.upload(fileInput!, oversizedFile);
+    await userEvent.upload(fileInput as HTMLInputElement, oversizedFile);
 
     expect(screen.getByText(/file size exceeds limit/i)).toBeInTheDocument();
-    expect(screen.getByText(/10MB/i)).toBeInTheDocument();
+    expect(screen.getByText(/100MB/i)).toBeInTheDocument();
   });
 
   it('shows invalid file type error when uploading non-audio file', async () => {
     render(<App />);
-    const fileInput = document.querySelector('input[type="file"]');
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     expect(fileInput).toBeInTheDocument();
 
     const wrongTypeFile = new File(['x'], 'doc.pdf', { type: 'application/pdf' });

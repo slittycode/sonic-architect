@@ -11,6 +11,7 @@ import {
   Settings,
   Cpu,
   Cloud,
+  Bot,
 } from 'lucide-react';
 import { AnalysisStatus, AnalysisProvider, ProviderType, ReconstructionBlueprint, PitchDetectionResult } from './types';
 import BlueprintDisplay from './components/BlueprintDisplay';
@@ -31,7 +32,7 @@ const ollamaProvider = new OllamaProvider(localProvider);
 function getStoredProvider(): ProviderType {
   try {
     const stored = localStorage.getItem('sonic-architect-provider');
-    if (stored === 'gemini' || stored === 'local' || stored === 'ollama') return stored;
+    if (stored === 'gemini' || stored === 'local' || stored === 'ollama' || stored === 'claude') return stored as ProviderType;
   } catch {}
   return 'local';
 }
@@ -103,6 +104,14 @@ const App: React.FC = () => {
       if (await gemini.isAvailable()) return gemini;
       // Fallback to local if Gemini API key is missing
       setProviderNotice('Gemini API key not found. Using Local DSP Engine.');
+    }
+
+    if (providerType === 'claude') {
+      const { ClaudeAnalysisProvider } = await import('./services/claudeProvider');
+      const claude = new ClaudeAnalysisProvider();
+      if (await claude.isAvailable()) return claude;
+      setProviderNotice('Claude API not configured. Using Local DSP Engine. Set ANTHROPIC_API_KEY.');
+      return localProvider;
     }
 
     return localProvider;
@@ -264,9 +273,11 @@ const App: React.FC = () => {
   const providerLabel =
     providerType === 'gemini'
       ? 'Gemini 1.5 Pro'
-      : providerType === 'ollama'
-        ? 'Ollama + Local DSP'
-        : 'Local DSP Engine';
+      : providerType === 'claude'
+        ? 'Claude'
+        : providerType === 'ollama'
+          ? 'Ollama + Local DSP'
+          : 'Local DSP Engine';
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center pb-20">
@@ -327,6 +338,16 @@ const App: React.FC = () => {
                     <div>
                       <p className="text-sm font-medium text-zinc-200">Ollama + Local DSP</p>
                       <p className="text-[10px] text-zinc-500">Local analysis with optional local-LLM enhancement.</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleProviderChange('claude')}
+                    className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'claude' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
+                  >
+                    <Bot className="w-4 h-4 text-zinc-400" />
+                    <div>
+                      <div className="text-sm font-medium text-zinc-200">Claude</div>
+                      <div className="text-xs text-zinc-500">Anthropic · Hybrid local+cloud</div>
                     </div>
                   </button>
                 </div>
@@ -417,16 +438,20 @@ const App: React.FC = () => {
                   <span className="text-sm font-semibold text-blue-200">
                     {providerType === 'gemini'
                       ? 'Neural Engine Analyzing Spectrogram...'
-                      : providerType === 'ollama'
-                        ? 'Analyzing Audio + Preparing Ollama Enhancement...'
-                        : 'Analyzing Audio Spectrogram...'}
+                      : providerType === 'claude'
+                        ? 'Claude Analyzing Spectrogram...'
+                        : providerType === 'ollama'
+                          ? 'Analyzing Audio + Preparing Ollama Enhancement...'
+                          : 'Analyzing Audio Spectrogram...'}
                   </span>
                   <span className="text-xs text-blue-400/80">
                     {providerType === 'gemini'
                       ? 'Identifying transients, frequency domains, and device chains...'
-                      : providerType === 'ollama'
-                        ? 'Running local DSP first, then enriching descriptions with Ollama...'
-                        : 'Extracting BPM, key, spectral features, and onset data...'}
+                      : providerType === 'claude'
+                        ? 'Reconstructing signal paths with Anthropic intelligence...'
+                        : providerType === 'ollama'
+                          ? 'Running local DSP first, then enriching descriptions with Ollama...'
+                          : 'Extracting BPM, key, spectral features, and onset data...'}
                   </span>
                 </div>
               </div>

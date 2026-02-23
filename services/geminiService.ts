@@ -122,7 +122,7 @@ async function analyzeAudioWithGemini(
     return validateBlueprint(parsed);
   } catch (error) {
     console.error("Gemini response failed blueprint validation:", error);
-    throw new Error("Analysis response did not match expected blueprint format. Please try again.");
+    throw new Error("Invalid analysis result; please try again.");
   }
 }
 
