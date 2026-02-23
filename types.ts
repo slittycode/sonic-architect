@@ -54,6 +54,11 @@ export interface ReconstructionBlueprint {
   secretSauce: SecretSauce;
   chordProgression?: ChordSegment[];
   chordProgressionSummary?: string;
+  patches?: {
+    vital?: string;
+    operator?: string;
+  };
+  mixReport?: MixDoctorReport;
   meta?: AnalysisMeta;
 }
 
@@ -71,7 +76,7 @@ export type ProviderType = 'local' | 'ollama' | 'gemini';
 export interface AnalysisProvider {
   name: string;
   type: ProviderType;
-  analyze(file: File): Promise<ReconstructionBlueprint>;
+  analyze(file: File, signal?: AbortSignal): Promise<ReconstructionBlueprint>;
   isAvailable(): Promise<boolean>;
 }
 
@@ -142,4 +147,34 @@ export interface SessionMusicianState {
   result: PitchDetectionResult | null;
   quantizeOptions: QuantizeOptions;
   error: string | null;
+}
+
+// --- Mix Doctor ---
+
+export interface GenreProfile {
+  id: string;
+  name: string;
+  /** Expected dynamics range (crest factor) in dB */
+  targetCrestFactorRange: [number, number];
+  /** Target average dB profiles for spectral bands */
+  spectralTargets: Record<string, { minDb: number; maxDb: number; optimalDb: number }>;
+}
+
+export interface MixAdvice {
+  band: string;
+  issue: 'too-loud' | 'too-quiet' | 'optimal';
+  message: string;
+  diffDb: number;
+}
+
+export interface MixDoctorReport {
+  genre: string;
+  targetProfile: GenreProfile;
+  advice: MixAdvice[];
+  dynamicsAdvice: {
+    issue: 'too-compressed' | 'too-dynamic' | 'optimal';
+    message: string;
+    actualCrest: number;
+  };
+  overallScore: number; // 0-100 indicating closeness to genre profile
 }

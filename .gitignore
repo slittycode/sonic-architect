@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Agent / AI tool artifacts
+.jules/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

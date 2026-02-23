@@ -70,4 +70,15 @@ describe('detectBPM', () => {
 
     expect(detectBPM(buffer)).toEqual({ bpm: 120, confidence: 0 });
   });
+
+  it('returns a fallback value (not throw) for a silent buffer', () => {
+    const sampleRate = 48_000;
+    const length = sampleRate * 4; // 4 seconds
+    const silentAudio = new Float32Array(length); // all zeros
+    const buffer = createMockAudioBuffer([silentAudio], sampleRate);
+
+    const result = detectBPM(buffer);
+    expect(typeof result.bpm).toBe('number');
+    expect(result.confidence).toBe(0);
+  });
 });
