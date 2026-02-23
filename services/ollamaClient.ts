@@ -24,10 +24,16 @@ export const DEFAULT_OLLAMA_CONFIG: OllamaConfig = {
  */
 export async function queryOllama(
   prompt: string,
-  config: OllamaConfig = DEFAULT_OLLAMA_CONFIG
+  config: OllamaConfig = DEFAULT_OLLAMA_CONFIG,
+  signal?: AbortSignal
 ): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
+  
+  if (signal) {
+    signal.addEventListener('abort', () => controller.abort());
+    if (signal.aborted) controller.abort();
+  }
 
   try {
     const response = await fetch(`${config.baseUrl}/api/generate`, {

@@ -10,6 +10,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { ReconstructionBlueprint } from '../types';
+import MixDoctorPanel from './MixDoctorPanel';
 
 interface BlueprintDisplayProps {
   blueprint: ReconstructionBlueprint;
@@ -24,7 +25,8 @@ const TelemetryItem: React.FC<{ label: string; value: string }> = ({ label, valu
 
 const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
       {/* Left Column: Telemetry & Arrangement */}
       <div className="lg:col-span-1 space-y-8">
@@ -61,7 +63,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         </div>
       </div>
 
-      {/* Middle Column: The Rack (Instruments) */}
+      {/* Middle Column: The Rack (Instruments) & Patches */}
       <div className="lg:col-span-1 space-y-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
           <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
@@ -93,6 +95,51 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
             ))}
           </div>
         </div>
+
+        {/* Patch Smith Section */}
+        {blueprint.patches && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+            <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-pink-400" aria-hidden="true" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Patch Smith (Auto-Generated)</h3>
+            </div>
+            <div className="p-5 flex flex-col gap-3">
+              <p className="text-xs text-zinc-400 mb-2">Synthesizer parameters procedurally generated from audio features.</p>
+              
+              <button 
+                onClick={() => {
+                  const blob = new Blob([blueprint.patches!.vital!], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'patch_smith.vitalpatch';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center justify-between px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded border border-zinc-700 transition-colors text-xs text-zinc-200"
+              >
+                <span>Download Vital Patch</span>
+                <span className="text-[10px] text-zinc-500 font-mono">.vitalpatch</span>
+              </button>
+              
+              <button 
+                onClick={() => {
+                  const blob = new Blob([blueprint.patches!.operator!], { type: 'text/xml' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'patch_smith.adv';
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex items-center justify-between px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded border border-zinc-700 transition-colors text-xs text-zinc-200"
+              >
+                <span>Download Ableton Operator</span>
+                <span className="text-[10px] text-zinc-500 font-mono">.adv</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Column: Effects & Secret Sauce */}
@@ -144,6 +191,12 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         </div>
       </div>
     </div>
+
+    {/* Mix Doctor Dashboard */}
+    {blueprint.mixReport && (
+      <MixDoctorPanel report={blueprint.mixReport} />
+    )}
+    </>
   );
 };
 

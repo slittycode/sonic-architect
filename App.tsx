@@ -20,6 +20,7 @@ import { LocalAnalysisProvider } from './services/localProvider';
 import { OllamaProvider } from './services/ollamaProvider';
 import { decodeAudioFile, extractWaveformPeaks } from './services/audioAnalysis';
 import { detectPitches } from './services/pitchDetection';
+import { downloadJson, downloadMarkdown } from './services/exportBlueprint';
 
 const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
 
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB (local analysis can handle larger files)
   const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
@@ -145,6 +147,7 @@ const App: React.FC = () => {
     setError(null);
     setMidiResult(null);
     setMidiError(null);
+    abortRef.current = new AbortController();
 
     let decodedBuffer: AudioBuffer | null = null;
     try {
@@ -167,15 +170,20 @@ const App: React.FC = () => {
       try {
         const provider = await getActiveProvider();
         const maybeBufferProvider = provider as AnalysisProvider & {
-          analyzeAudioBuffer?: (audioBuffer: AudioBuffer) => Promise<ReconstructionBlueprint>;
+          analyzeAudioBuffer?: (audioBuffer: AudioBuffer, signal?: AbortSignal) => Promise<ReconstructionBlueprint>;
         };
         const result = decodedBuffer && typeof maybeBufferProvider.analyzeAudioBuffer === 'function'
-          ? await maybeBufferProvider.analyzeAudioBuffer(decodedBuffer)
-          : await provider.analyze(file);
+          ? await maybeBufferProvider.analyzeAudioBuffer(decodedBuffer, abortRef.current?.signal)
+          : await provider.analyze(file, abortRef.current?.signal);
         setBlueprint(result);
         setStatus(AnalysisStatus.COMPLETED);
         return result;
       } catch (err: any) {
+        if (err.name === 'AbortError' || err instanceof DOMException && err.name === 'AbortError') {
+          setStatus(AnalysisStatus.IDLE);
+          setError(null);
+          return null;
+        }
         console.error(err);
         setError(err.message || "An unexpected error occurred during analysis.");
         setStatus(AnalysisStatus.ERROR);
@@ -218,6 +226,7 @@ const App: React.FC = () => {
     setMidiResult(null);
     setMidiDetecting(false);
     setMidiError(null);
+    abortRef.current?.abort();
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -401,24 +410,32 @@ const App: React.FC = () => {
           )}
 
           {status === AnalysisStatus.ANALYZING && (
-            <div className="mt-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg flex items-center gap-4 animate-pulse">
-              <Activity className="w-5 h-5 text-blue-400 animate-spin" aria-hidden="true" />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-blue-200">
-                  {providerType === 'gemini'
-                    ? 'Neural Engine Analyzing Spectrogram...'
-                    : providerType === 'ollama'
-                      ? 'Analyzing Audio + Preparing Ollama Enhancement...'
-                      : 'Analyzing Audio Spectrogram...'}
-                </span>
-                <span className="text-xs text-blue-400/80">
-                  {providerType === 'gemini'
-                    ? 'Identifying transients, frequency domains, and device chains...'
-                    : providerType === 'ollama'
-                      ? 'Running local DSP first, then enriching descriptions with Ollama...'
-                      : 'Extracting BPM, key, spectral features, and onset data...'}
-                </span>
+            <div className="mt-6 p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg flex items-center justify-between gap-4 animate-pulse">
+              <div className="flex items-center gap-4">
+                <Activity className="w-5 h-5 text-blue-400 animate-spin" aria-hidden="true" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-blue-200">
+                    {providerType === 'gemini'
+                      ? 'Neural Engine Analyzing Spectrogram...'
+                      : providerType === 'ollama'
+                        ? 'Analyzing Audio + Preparing Ollama Enhancement...'
+                        : 'Analyzing Audio Spectrogram...'}
+                  </span>
+                  <span className="text-xs text-blue-400/80">
+                    {providerType === 'gemini'
+                      ? 'Identifying transients, frequency domains, and device chains...'
+                      : providerType === 'ollama'
+                        ? 'Running local DSP first, then enriching descriptions with Ollama...'
+                        : 'Extracting BPM, key, spectral features, and onset data...'}
+                  </span>
+                </div>
               </div>
+              <button 
+                onClick={() => abortRef.current?.abort()}
+                className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-200 text-sm font-medium rounded-md transition-colors border border-red-800/50 flex-shrink-0"
+              >
+                Cancel
+              </button>
             </div>
           )}
 
@@ -500,6 +517,15 @@ const App: React.FC = () => {
                 )}
               </div>
             )}
+            
+            <div className="flex gap-2 justify-end -mt-2 mb-2">
+              <button onClick={() => downloadJson(blueprint!, fileName || 'stem')} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-md transition-all border border-zinc-700">
+                Export JSON
+              </button>
+              <button onClick={() => downloadMarkdown(blueprint!, fileName || 'stem')} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-md transition-all border border-zinc-700">
+                Export MD
+              </button>
+            </div>
             <BlueprintDisplay blueprint={blueprint} />
           </>
         )}

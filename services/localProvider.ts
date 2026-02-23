@@ -18,6 +18,8 @@ import {
   getFXRecommendations,
   getSecretSauce,
 } from '../data/abletonDevices';
+import { generateVitalPatch, generateOperatorPatch } from './patchSmith';
+import { generateMixReport } from './mixDoctor';
 
 /**
  * Segment the RMS energy profile into arrangement sections.
@@ -201,6 +203,11 @@ export function buildLocalBlueprint(
   const instrumentation = getInstrumentRecommendations(features.spectralBands);
   const fxChain = getFXRecommendations(features);
   const secretSauce = getSecretSauce(features);
+  const patches = {
+    vital: generateVitalPatch(features),
+    operator: generateOperatorPatch(features)
+  };
+  const mixReport = generateMixReport(features); // Use default EDM profile
 
   return {
     telemetry: {
@@ -217,6 +224,8 @@ export function buildLocalBlueprint(
       recommendation: 'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
     }],
     secretSauce,
+    patches,
+    mixReport,
     meta: {
       provider,
       analysisTime,
@@ -236,16 +245,19 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     return true;
   }
 
-  async analyze(file: File): Promise<ReconstructionBlueprint> {
+  async analyze(file: File, signal?: AbortSignal): Promise<ReconstructionBlueprint> {
     const audioBuffer = await decodeAudioFile(file);
-    return this.analyzeAudioBuffer(audioBuffer);
+    signal?.throwIfAborted();
+    return this.analyzeAudioBuffer(audioBuffer, signal);
   }
 
-  async analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<ReconstructionBlueprint> {
+  async analyzeAudioBuffer(audioBuffer: AudioBuffer, signal?: AbortSignal): Promise<ReconstructionBlueprint> {
     const startTime = performance.now();
 
     // Extract features
     const features = extractAudioFeatures(audioBuffer);
+    signal?.throwIfAborted();
+    
     const analysisTime = Math.round(performance.now() - startTime);
     return buildLocalBlueprint(features, analysisTime, 'local');
   }
