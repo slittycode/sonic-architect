@@ -30,15 +30,10 @@ export interface PreviewHandle {
  * amplitude envelope for a clean piano-like attack/release.
  *
  * @param notes   Notes to preview (will be sorted by startTime)
- * @param bpm     Tempo (used for display context, not yet for quantized playback)
  * @param onEnd   Callback when playback finishes naturally
  * @returns A handle to stop playback
  */
-export function previewNotes(
-  notes: DetectedNote[],
-  _bpm: number = 120,
-  onEnd?: () => void,
-): PreviewHandle {
+export function previewNotes(notes: DetectedNote[], onEnd?: () => void): PreviewHandle {
   const ctx = new AudioContext();
   const masterGain = ctx.createGain();
   masterGain.gain.value = 0.35; // prevent clipping with many notes

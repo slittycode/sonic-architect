@@ -38,11 +38,7 @@ function durationToTicks(durationSec: number, bpm: number): number {
  *
  * @returns A Blob containing a valid .mid file
  */
-export function createMidiFile(
-  notes: DetectedNote[],
-  bpm: number = 120,
-  trackName: string = 'Sonic Architect — Session Musician',
-): Blob {
+export function createMidiFile(notes: DetectedNote[], bpm: number = 120): Blob {
   const track = new MidiWriter.Track();
 
   // Set metadata
@@ -66,7 +62,7 @@ export function createMidiFile(
         duration: `T${durTicks}`,
         velocity,
         startTick,
-      }),
+      })
     );
   }
 
@@ -82,7 +78,7 @@ export function createMidiFile(
 export function downloadMidiFile(
   notes: DetectedNote[],
   bpm: number,
-  fileName: string = 'session-musician.mid',
+  fileName: string = 'session-musician.mid'
 ): void {
   const blob = createMidiFile(notes, bpm);
   const url = URL.createObjectURL(blob);

@@ -29,7 +29,7 @@ pnpm install
 pnpm dev
 ```
 
-Open **http://localhost:5173** in your browser, click **Import Stem**, and upload an audio file.
+Open **http://localhost:3000** in your browser, click **Import Stem**, and upload an audio file.
 
 ### Gemini API (optional)
 
@@ -45,11 +45,56 @@ The app works fully offline with the Local DSP engine. To enable cloud analysis 
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server (Vite) |
-| `pnpm build` | Production build to `dist/` |
-| `pnpm preview` | Preview the production build locally |
+| Command                 | Description                                                          |
+| ----------------------- | -------------------------------------------------------------------- |
+| `pnpm dev`              | Start development server (Vite)                                      |
+| `pnpm build`            | Production build to `dist/`                                          |
+| `pnpm preview`          | Preview the production build locally                                 |
+| `pnpm run typecheck`    | Run TypeScript checks                                                |
+| `pnpm run lint`         | Run ESLint checks                                                    |
+| `pnpm run format:check` | Verify Prettier formatting                                           |
+| `pnpm run qa:static`    | Run deterministic static gates (`typecheck`, `lint`, `format:check`) |
+| `pnpm run qa:test`      | Run deterministic Vitest suite                                       |
+| `pnpm run qa:review`    | Run headless Codex review (local CLI/auth required)                  |
+| `pnpm run qa:all`       | Run static + test gates                                              |
+
+## Deterministic QA Workflow
+
+Use this sequence for a full deterministic review/test pass:
+
+```bash
+# 1) Static gates
+pnpm run qa:static
+
+# 2) Automated tests
+pnpm run qa:test
+
+# 3) Optional: AI-assisted full code review
+pnpm run qa:review
+```
+
+`qa:review` does not run in CI; it is a local review helper for severity-ranked findings.
+
+### Browser smoke checks
+
+Start the app and run Playwright smoke scripts against the same URL (defaults to `http://localhost:3000`):
+
+```bash
+# Terminal 1
+pnpm dev
+
+# Terminal 2
+APP_URL=http://localhost:3000 python verification/verify_animation.py
+APP_URL=http://localhost:3000 python verification/verify_shortcuts.py
+```
+
+Screenshots are written outside the repo by default to a temp directory. To override:
+
+```bash
+VERIFICATION_OUTPUT_DIR=/absolute/path/to/artifacts APP_URL=http://localhost:3000 python verification/verify_animation.py
+```
+
+These checks are deterministic UI sanity checks and do not call live Gemini/Claude APIs.
 
 ## Tech Stack
 

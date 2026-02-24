@@ -67,7 +67,7 @@ function midiToNoteName(midi: number): string {
  */
 function yinDetectPitch(
   samples: Float32Array,
-  sampleRate: number,
+  sampleRate: number
 ): { frequency: number; confidence: number } {
   const halfWindow = Math.floor(samples.length / 2);
 
@@ -140,7 +140,7 @@ function detectFrames(audioBuffer: AudioBuffer): RawDetection[] {
   const detections: RawDetection[] = [];
 
   for (let offset = 0; offset + WINDOW_SIZE <= totalSamples; offset += HOP_SIZE) {
-    const frame = channelData.slice(offset, offset + WINDOW_SIZE);
+    const frame = channelData.subarray(offset, offset + WINDOW_SIZE);
 
     // RMS for this frame → velocity / silence gate
     let rmsSum = 0;
@@ -178,7 +178,7 @@ function detectFrames(audioBuffer: AudioBuffer): RawDetection[] {
 function segmentNotes(
   detections: RawDetection[],
   maxRms: number,
-  sampleRate: number,
+  sampleRate: number
 ): DetectedNote[] {
   if (detections.length === 0) return [];
 
@@ -187,7 +187,24 @@ function segmentNotes(
   let noteEnd = detections[0];
   let peakRms = detections[0].rms;
   let confidenceSum = detections[0].confidence;
+  let midiSum = detections[0].midi;
   let frameCount = 1;
+
+  const pushCurrentNote = () => {
+    const duration = noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
+    if (duration < MIN_NOTE_DURATION) return;
+
+    const roundedMidi = Math.round(midiSum / frameCount);
+    notes.push({
+      midi: Math.max(0, Math.min(127, roundedMidi)),
+      name: midiToNoteName(roundedMidi),
+      frequency: noteStart.frequency,
+      startTime: noteStart.time,
+      duration,
+      velocity: Math.max(1, Math.min(127, Math.round((peakRms / (maxRms || 1)) * 127))),
+      confidence: confidenceSum / frameCount,
+    });
+  };
 
   for (let i = 1; i < detections.length; i++) {
     const prev = detections[i - 1];
@@ -201,56 +218,23 @@ function segmentNotes(
       noteEnd = curr;
       peakRms = Math.max(peakRms, curr.rms);
       confidenceSum += curr.confidence;
+      midiSum += curr.midi;
       frameCount++;
     } else {
-      // Finalize previous note
-      const duration = noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
-      if (duration >= MIN_NOTE_DURATION) {
-        const roundedMidi = Math.round(
-          (detections.slice(
-            detections.indexOf(noteStart),
-            detections.indexOf(noteEnd) + 1,
-          ).reduce((s, d) => s + d.midi, 0)) / frameCount,
-        );
-        notes.push({
-          midi: Math.max(0, Math.min(127, roundedMidi)),
-          name: midiToNoteName(roundedMidi),
-          frequency: noteStart.frequency,
-          startTime: noteStart.time,
-          duration,
-          velocity: Math.max(1, Math.min(127, Math.round((peakRms / (maxRms || 1)) * 127))),
-          confidence: confidenceSum / frameCount,
-        });
-      }
+      pushCurrentNote();
 
       // Start new note
       noteStart = curr;
       noteEnd = curr;
       peakRms = curr.rms;
       confidenceSum = curr.confidence;
+      midiSum = curr.midi;
       frameCount = 1;
     }
   }
 
   // Finalize last note
-  const duration = noteEnd.time - noteStart.time + getFrameDurationSeconds(sampleRate);
-  if (duration >= MIN_NOTE_DURATION) {
-    const roundedMidi = Math.round(
-      (detections.slice(
-        detections.indexOf(noteStart),
-        detections.indexOf(noteEnd) + 1,
-      ).reduce((s, d) => s + d.midi, 0)) / frameCount,
-    );
-    notes.push({
-      midi: Math.max(0, Math.min(127, roundedMidi)),
-      name: midiToNoteName(roundedMidi),
-      frequency: noteStart.frequency,
-      startTime: noteStart.time,
-      duration,
-      velocity: Math.max(1, Math.min(127, Math.round((peakRms / (maxRms || 1)) * 127))),
-      confidence: confidenceSum / frameCount,
-    });
-  }
+  pushCurrentNote();
 
   return notes;
 }
@@ -265,7 +249,7 @@ function segmentNotes(
  */
 export async function detectPitches(
   audioBuffer: AudioBuffer,
-  bpm: number = 120,
+  bpm: number = 120
 ): Promise<PitchDetectionResult> {
   // Run frame-level YIN detection
   const detections = detectFrames(audioBuffer);
@@ -278,9 +262,7 @@ export async function detectPitches(
 
   // Overall confidence = mean of note confidences
   const avgConfidence =
-    notes.length > 0
-      ? notes.reduce((s, n) => s + n.confidence, 0) / notes.length
-      : 0;
+    notes.length > 0 ? notes.reduce((s, n) => s + n.confidence, 0) / notes.length : 0;
 
   return {
     notes,

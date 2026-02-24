@@ -11,7 +11,37 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 
 // Krumhansl-Kessler key profiles (perceptual weightings)
 const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
-const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const FRAME_SIZE = 4096;
+const HOP_SIZE = 2048;
+const MAX_KEY_FRAMES = 180;
+
+interface GoertzelBin {
+  pitchClass: number;
+  coeff: number;
+}
+
+function buildGoertzelBins(sampleRate: number): GoertzelBin[] {
+  const bins: GoertzelBin[] = [];
+  // Check octaves 2-7 (C2 ~65Hz to B7 ~3951Hz)
+  for (let octave = 2; octave <= 7; octave++) {
+    for (let pitchClass = 0; pitchClass < 12; pitchClass++) {
+      const midiNote = octave * 12 + pitchClass;
+      const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+
+      // Skip frequencies above Nyquist or below useful range
+      if (freq > sampleRate / 2 || freq < 50) continue;
+
+      const k = Math.round((freq * FRAME_SIZE) / sampleRate);
+      const w = (2 * Math.PI * k) / FRAME_SIZE;
+      bins.push({
+        pitchClass,
+        coeff: 2 * Math.cos(w),
+      });
+    }
+  }
+  return bins;
+}
 
 /**
  * Compute chroma features from an AudioBuffer.
@@ -21,50 +51,34 @@ function computeChroma(audioBuffer: AudioBuffer): number[] {
   const sampleRate = audioBuffer.sampleRate;
   const data = audioBuffer.getChannelData(0);
   const chroma = new Float64Array(12);
-
-  // Use frames of audio, compute a simple DFT at each pitch class frequency
-  const frameSize = 4096;
-  const hopSize = 2048;
-  const numFrames = Math.floor((data.length - frameSize) / hopSize);
+  const numFrames = Math.floor((data.length - FRAME_SIZE) / HOP_SIZE);
 
   if (numFrames < 1) {
     return Array.from(chroma);
   }
 
-  // For each frame, use the Goertzel algorithm to efficiently compute
-  // energy at each pitch class frequency across multiple octaves
-  for (let frame = 0; frame < numFrames; frame++) {
-    const start = frame * hopSize;
+  const goertzelBins = buildGoertzelBins(sampleRate);
+  const frameStride = Math.max(1, Math.ceil(numFrames / MAX_KEY_FRAMES));
 
-    // Check octaves 2-7 (C2 ~65Hz to B7 ~3951Hz)
-    for (let octave = 2; octave <= 7; octave++) {
-      for (let pitchClass = 0; pitchClass < 12; pitchClass++) {
-        // MIDI note number
-        const midiNote = octave * 12 + pitchClass;
-        const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+  // For each sampled frame, use precomputed Goertzel bins to accumulate chroma energy.
+  for (let frame = 0; frame < numFrames; frame += frameStride) {
+    const start = frame * HOP_SIZE;
 
-        // Skip frequencies above Nyquist or below useful range
-        if (freq > sampleRate / 2 || freq < 50) continue;
+    for (const bin of goertzelBins) {
+      const { coeff, pitchClass } = bin;
 
-        // Goertzel algorithm for single frequency detection
-        const k = Math.round(freq * frameSize / sampleRate);
-        const w = (2 * Math.PI * k) / frameSize;
-        const cosW = Math.cos(w);
-        const coeff = 2 * cosW;
+      let s0 = 0;
+      let s1 = 0;
+      let s2 = 0;
 
-        let s0 = 0;
-        let s1 = 0;
-        let s2 = 0;
-
-        for (let i = 0; i < frameSize; i++) {
-          s0 = (data[start + i] ?? 0) + coeff * s1 - s2;
-          s2 = s1;
-          s1 = s0;
-        }
-
-        const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
-        chroma[pitchClass] += Math.max(0, power);
+      for (let i = 0; i < FRAME_SIZE; i++) {
+        s0 = (data[start + i] ?? 0) + coeff * s1 - s2;
+        s2 = s1;
+        s1 = s0;
       }
+
+      const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+      chroma[pitchClass] += Math.max(0, power);
     }
   }
 

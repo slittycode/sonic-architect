@@ -19,6 +19,7 @@ dist-ssr
 
 # Agent / AI tool artifacts
 .jules/
+verification/*.png
 
 # Editor directories and files
 .vscode/*

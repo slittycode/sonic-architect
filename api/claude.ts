@@ -79,12 +79,12 @@ function sseChunk(payload: Record<string, unknown>): Uint8Array {
 
 async function streamClaudeResponse(
   anthropic: Anthropic,
-  body: ClaudeRequestBody,
+  body: ClaudeRequestBody
 ): Promise<ReadableStream<Uint8Array>> {
   const stream = anthropic.messages.stream({
     model: 'claude-opus-4-6',
     max_tokens: 4096,
-    thinking: { type: 'adaptive' } as any,
+    thinking: { type: 'adaptive' },
     system: buildSystemPrompt(body.mode, body.blueprint),
     messages: body.messages.map((message) => ({
       role: message.role,
@@ -120,7 +120,7 @@ async function streamClaudeResponse(
           sseChunk({
             type: 'error',
             error: error instanceof Error ? error.message : 'Claude stream failed',
-          }),
+          })
         );
         controller.close();
       }
@@ -152,12 +152,11 @@ export default async function handler(req: Request): Promise<Response> {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const envKey = typeof process?.env?.ANTHROPIC_API_KEY === 'string' ? process.env.ANTHROPIC_API_KEY : '';
   const headerKey = req.headers.get('x-api-key')?.trim() ?? '';
-  const apiKey = headerKey || envKey;
-
-  if (!apiKey) {
-    return jsonResponse(401, { error: 'Missing Anthropic API key.' });
+  if (!headerKey) {
+    return jsonResponse(401, {
+      error: 'Missing Anthropic API key. Provide it in the x-api-key request header.',
+    });
   }
 
   let rawBody: unknown;
@@ -169,14 +168,16 @@ export default async function handler(req: Request): Promise<Response> {
 
   const body = parseRequestBody(rawBody);
   if (!body) {
-    return jsonResponse(400, { error: 'Invalid payload. Expected { messages, blueprint?, mode }.' });
+    return jsonResponse(400, {
+      error: 'Invalid payload. Expected { messages, blueprint?, mode }.',
+    });
   }
   if (body.messages.length === 0) {
     return jsonResponse(400, { error: 'At least one message is required.' });
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey });
+    const anthropic = new Anthropic({ apiKey: headerKey });
     const sse = await streamClaudeResponse(anthropic, body);
     return new Response(sse, { status: 200, headers: SSE_HEADERS });
   } catch (error) {

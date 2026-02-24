@@ -13,13 +13,15 @@ describe('ollamaClient', () => {
   });
 
   it('throws a descriptive error when response is not ok', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      text: async () => 'Internal Server Error'
-    } as any);
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response('Internal Server Error', {
+        status: 500,
+        statusText: 'Internal Server Error',
+      })
+    );
 
-    await expect(queryOllama('test prompt')).rejects.toThrow(/Ollama error 500: Internal Server Error/);
+    await expect(queryOllama('test prompt')).rejects.toThrow(
+      /Ollama error 500: Internal Server Error/
+    );
   });
 });

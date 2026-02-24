@@ -18,12 +18,7 @@ import {
   ChevronUp,
   Info,
 } from 'lucide-react';
-import {
-  DetectedNote,
-  PitchDetectionResult,
-  QuantizeGrid,
-  QuantizeOptions,
-} from '../types';
+import { DetectedNote, PitchDetectionResult, QuantizeGrid, QuantizeOptions } from '../types';
 import { quantizeNotes, gridLabel } from '../services/quantization';
 import { downloadMidiFile } from '../services/midiExport';
 import { previewNotes, PreviewHandle } from '../services/midiPreview';
@@ -50,20 +45,16 @@ const GRID_OPTIONS: QuantizeGrid[] = ['off', '1/4', '1/8', '1/16', '1/32'];
 const PIANO_ROLL_HEIGHT = 240;
 const KEY_WIDTH = 40;
 const NOTE_COLORS = {
-  fill: '#3b82f6',      // blue-500
-  fillHigh: '#60a5fa',  // blue-400 (high confidence)
-  fillLow: '#1e3a5f',   // muted blue (low confidence)
-  stroke: '#1d4ed8',    // blue-700
-  grid: '#27272a',       // zinc-800
-  text: '#a1a1aa',       // zinc-400
-  bg: '#09090b',         // zinc-950
+  fill: '#3b82f6', // blue-500
+  fillHigh: '#60a5fa', // blue-400 (high confidence)
+  fillLow: '#1e3a5f', // muted blue (low confidence)
+  stroke: '#1d4ed8', // blue-700
+  grid: '#27272a', // zinc-800
+  text: '#a1a1aa', // zinc-400
+  bg: '#09090b', // zinc-950
 };
 
-function drawPianoRoll(
-  canvas: HTMLCanvasElement,
-  notes: DetectedNote[],
-  duration: number,
-) {
+function drawPianoRoll(canvas: HTMLCanvasElement, notes: DetectedNote[], duration: number) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
@@ -222,13 +213,13 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
 
     if (displayNotes.length === 0) return;
 
-    const handle = previewNotes(displayNotes, result?.bpm, () => {
+    const handle = previewNotes(displayNotes, () => {
       setIsPreviewing(false);
       previewRef.current = null;
     });
     previewRef.current = handle;
     setIsPreviewing(true);
-  }, [isPreviewing, displayNotes, result?.bpm]);
+  }, [isPreviewing, displayNotes]);
 
   const handleDownload = useCallback(() => {
     if (displayNotes.length === 0 || !result) return;
@@ -262,13 +253,17 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="p-2 bg-zinc-800 rounded-full">
             <Music2 className="w-5 h-5 text-violet-400" aria-hidden="true" />
           </div>
-          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">Session Musician</h2>
+          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">
+            Session Musician
+          </h2>
         </div>
         <div className="flex items-center gap-4 p-4 bg-violet-900/20 border border-violet-800/50 rounded-lg animate-pulse">
           <Loader2 className="w-5 h-5 text-violet-400 animate-spin" />
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-violet-200">Detecting pitches…</span>
-            <span className="text-xs text-violet-400/80">Running YIN autocorrelation on audio frames</span>
+            <span className="text-xs text-violet-400/80">
+              Running YIN autocorrelation on audio frames
+            </span>
           </div>
         </div>
       </section>
@@ -284,7 +279,9 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="p-2 bg-zinc-800 rounded-full">
             <Music2 className="w-5 h-5 text-violet-400" aria-hidden="true" />
           </div>
-          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">Session Musician</h2>
+          <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">
+            Session Musician
+          </h2>
         </div>
         <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg text-sm text-red-200">
           {error}
@@ -308,8 +305,12 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
             <Music2 className="w-5 h-5 text-violet-400" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">Session Musician</h2>
-            <p className="text-[10px] text-zinc-500 mono tracking-widest uppercase">Audio → MIDI Transcription</p>
+            <h2 className="text-sm font-semibold text-zinc-200 uppercase tracking-wider">
+              Session Musician
+            </h2>
+            <p className="text-[10px] text-zinc-500 mono tracking-widest uppercase">
+              Audio → MIDI Transcription
+            </p>
           </div>
         </div>
 
@@ -321,11 +322,7 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-800/40 hover:bg-violet-700/50 disabled:opacity-40 disabled:cursor-not-allowed text-violet-200 text-xs rounded-md transition-all border border-violet-700/40"
             title={isPreviewing ? 'Stop preview' : 'Preview MIDI'}
           >
-            {isPreviewing ? (
-              <Square className="w-3.5 h-3.5" />
-            ) : (
-              <Play className="w-3.5 h-3.5" />
-            )}
+            {isPreviewing ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
             {isPreviewing ? 'Stop' : 'Preview'}
           </button>
 
@@ -368,18 +365,16 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
 
           {/* Piano roll canvas */}
           <div className="rounded-lg border border-zinc-800 overflow-hidden mb-4">
-            <canvas
-              ref={canvasRef}
-              className="w-full"
-              style={{ height: PIANO_ROLL_HEIGHT }}
-            />
+            <canvas ref={canvasRef} className="w-full" style={{ height: PIANO_ROLL_HEIGHT }} />
           </div>
 
           {/* Quantization controls */}
           <div className="flex items-center gap-6 p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg">
             <div className="flex items-center gap-2">
               <Grid3X3 className="w-3.5 h-3.5 text-zinc-500" />
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Quantize</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                Quantize
+              </span>
             </div>
 
             {/* Grid selector */}
@@ -427,8 +422,9 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="flex items-start gap-2 mt-3 text-[10px] text-zinc-600">
             <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
             <span>
-              Monophonic pitch detection via YIN autocorrelation. Best results with clean, single-instrument stems.
-              Adjust quantization to snap notes to the rhythmic grid before downloading.
+              Monophonic pitch detection via YIN autocorrelation. Best results with clean,
+              single-instrument stems. Adjust quantization to snap notes to the rhythmic grid before
+              downloading.
             </span>
           </div>
         </>

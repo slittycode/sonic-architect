@@ -18,6 +18,20 @@ export const DEFAULT_OLLAMA_CONFIG: OllamaConfig = {
   temperature: 0.3,
 };
 
+interface OllamaTagsPayload {
+  models?: Array<{ name?: unknown }>;
+}
+
+function parseModelNames(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return [];
+  const models = (payload as OllamaTagsPayload).models;
+  if (!Array.isArray(models)) return [];
+
+  return models
+    .map((model) => (typeof model?.name === 'string' ? model.name : null))
+    .filter((name): name is string => Boolean(name));
+}
+
 /**
  * Query Ollama's generate endpoint and return the response text.
  * Uses `format: 'json'` to request structured JSON output.
@@ -29,7 +43,7 @@ export async function queryOllama(
 ): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
-  
+
   if (signal) {
     signal.addEventListener('abort', () => controller.abort());
     if (signal.aborted) controller.abort();
@@ -51,9 +65,7 @@ export async function queryOllama(
 
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      throw new Error(
-        `Ollama error ${response.status}: ${body || response.statusText}`
-      );
+      throw new Error(`Ollama error ${response.status}: ${body || response.statusText}`);
     }
 
     const data = await response.json();
@@ -92,7 +104,7 @@ export async function listOllamaModels(
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.models?.map((m: any) => m.name as string) ?? [];
+    return parseModelNames(data);
   } catch {
     return [];
   }
