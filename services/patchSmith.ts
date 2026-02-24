@@ -32,12 +32,12 @@ export function calculateSynthParams(features: AudioFeatures) {
 
   // 3. Oscillator Waveform from Spectral Bands
   // If Highs are dominant, use saw. If Lows dominant and Highs absent, use sine. Otherwise square.
-  const highs = features.spectralBands.find(b => b.name === 'Highs')?.averageDb ?? -100;
-  const lows = features.spectralBands.find(b => b.name === 'Sub Bass')?.averageDb ?? -100;
-  
+  const highs = features.spectralBands.find((b) => b.name === 'Highs')?.averageDb ?? -100;
+  const lows = features.spectralBands.find((b) => b.name === 'Sub Bass')?.averageDb ?? -100;
+
   let waveform = 'sine';
   let operatorWave = 0; // 0 = sine, 1 = saw, 2 = square
-  
+
   if (highs > -30) {
     waveform = 'sawtooth';
     operatorWave = 1;
@@ -54,11 +54,11 @@ export function calculateSynthParams(features: AudioFeatures) {
 
 export function generateVitalPatch(features: AudioFeatures): string {
   const params = calculateSynthParams(features);
-  
+
   const vitalPatch = {
-    plugin_version: "1.5.5",
-    author: "Patch Smith by Sonic Architect",
-    name: "Auto-Generated Blueprint",
+    plugin_version: '1.5.5',
+    author: 'Patch Smith by Sonic Architect',
+    name: 'Auto-Generated Blueprint',
     settings: {
       osc_1_on: 1,
       osc_1_waveform: params.waveform,
@@ -68,8 +68,8 @@ export function generateVitalPatch(features: AudioFeatures): string {
       env_1_decay: params.decay,
       env_1_sustain: params.sustain,
       env_1_release: params.release,
-      volume: 0.8
-    }
+      volume: 0.8,
+    },
   };
 
   return JSON.stringify(vitalPatch, null, 2);
@@ -77,7 +77,7 @@ export function generateVitalPatch(features: AudioFeatures): string {
 
 export function generateOperatorPatch(features: AudioFeatures): string {
   const params = calculateSynthParams(features);
-  
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Ableton MajorVersion="5" MinorVersion="11.0_11300" SchemaChangeCount="3" Creator="Ableton Live 11.0.0">
 	<Preset>

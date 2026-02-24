@@ -8,15 +8,15 @@
 
 ## Why local LLM instead of Gemini
 
-| Factor | Gemini API | Ollama (local) |
-| --- | --- | --- |
-| Cost | Pay per token | Free |
-| Privacy | Audio sent to Google | Everything stays on machine |
-| Latency | Network dependent | Local inference (3-15s for 7B models) |
-| Offline | No | Yes |
-| Audio understanding | Native multimodal | No — we feed it extracted features (text/JSON) |
-| Setup | API key + billing | `brew install ollama && ollama pull llama3.2` |
-| Quality ceiling | Higher (Pro is strong) | Lower but sufficient for structured prompts |
+| Factor              | Gemini API             | Ollama (local)                                 |
+| ------------------- | ---------------------- | ---------------------------------------------- |
+| Cost                | Pay per token          | Free                                           |
+| Privacy             | Audio sent to Google   | Everything stays on machine                    |
+| Latency             | Network dependent      | Local inference (3-15s for 7B models)          |
+| Offline             | No                     | Yes                                            |
+| Audio understanding | Native multimodal      | No — we feed it extracted features (text/JSON) |
+| Setup               | API key + billing      | `brew install ollama && ollama pull llama3.2`  |
+| Quality ceiling     | Higher (Pro is strong) | Lower but sufficient for structured prompts    |
 
 The key insight: **we don't need the LLM to "listen" to audio**. Plan 1's local DSP extracts all the quantitative data (BPM, key, spectral features, onsets). The LLM's job is limited to:
 
@@ -37,15 +37,12 @@ Ollama exposes a local REST API at `http://localhost:11434`. Build a lightweight
 ```typescript
 // services/ollamaClient.ts
 export interface OllamaConfig {
-  baseUrl: string;     // default: http://localhost:11434
-  model: string;       // default: llama3.2
+  baseUrl: string; // default: http://localhost:11434
+  model: string; // default: llama3.2
   temperature: number; // default: 0.3 (low for structured output)
 }
 
-export async function queryOllama(
-  prompt: string,
-  config: OllamaConfig
-): Promise<string> {
+export async function queryOllama(prompt: string, config: OllamaConfig): Promise<string> {
   const response = await fetch(`${config.baseUrl}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -54,8 +51,8 @@ export async function queryOllama(
       prompt,
       stream: false,
       format: 'json',
-      options: { temperature: config.temperature }
-    })
+      options: { temperature: config.temperature },
+    }),
   });
   if (!response.ok) throw new Error(`Ollama error: ${response.status}`);
   const data = await response.json();
@@ -85,7 +82,7 @@ Combines Plan 1's local DSP output with Ollama for interpretive text:
 ```typescript
 // services/providers/ollamaProvider.ts
 export class OllamaProvider implements AnalysisProvider {
-  name = "Local LLM (Ollama)";
+  name = 'Local LLM (Ollama)';
 
   async analyze(audioBuffer: AudioBuffer): Promise<ReconstructionBlueprint> {
     // Step 1: Run local DSP analysis (same as LocalAnalysisProvider)
@@ -157,11 +154,12 @@ export interface LLMConfig {
   type: 'ollama' | 'openai-compatible';
   baseUrl: string;
   model: string;
-  apiKey?: string;  // optional, for services that need it
+  apiKey?: string; // optional, for services that need it
 }
 ```
 
 This covers:
+
 - Ollama (`http://localhost:11434`)
 - LM Studio (`http://localhost:1234/v1`)
 - llama.cpp server (`http://localhost:8080/v1`)
@@ -180,6 +178,7 @@ connect-src 'self' https://generativelanguage.googleapis.com http://localhost:*;
 ## What the user experiences
 
 **Without Ollama (zero setup):**
+
 - Upload audio, get analysis in 2-5 seconds
 - BPM, key, arrangement sections with confidence scores
 - Spectral-band instrumentation with Ableton device recommendations from knowledge base
@@ -187,12 +186,14 @@ connect-src 'self' https://generativelanguage.googleapis.com http://localhost:*;
 - Secret sauce: template-based ("Dominant technique: Heavy sidechain compression detected. Try Ableton Compressor with sidechain input from kick, Attack 0.01ms, Release 200ms")
 
 **With Ollama running:**
+
 - Same quantitative data, but enriched with natural language descriptions
 - "The sub bass has a warm, analog character with slight harmonic saturation — reminiscent of a Moog-style ladder filter"
 - More creative secret sauce suggestions
 - 5-15 seconds total (DSP + LLM inference)
 
 **With Gemini (opt-in legacy):**
+
 - Original behavior, fully multimodal analysis
 - Requires API key configuration
 
@@ -200,14 +201,14 @@ connect-src 'self' https://generativelanguage.googleapis.com http://localhost:*;
 
 ## Recommended models for Ollama
 
-| Model | Size | Speed | Quality for this task |
-| --- | --- | --- | --- |
-| `llama3.2:3b` | 2GB | Fast (2-5s) | Good for basic enhancement |
-| `llama3.2` | 4.7GB | Medium (5-10s) | Good balance |
-| `mistral` | 4.1GB | Medium (5-8s) | Strong structured output |
-| `llama3.1:8b` | 4.7GB | Medium (5-10s) | Best quality at reasonable speed |
-| `qwen2.5:7b` | 4.4GB | Medium (5-10s) | Excellent instruction following |
-| `deepseek-r1:8b` | 4.9GB | Slower (10-20s) | Strongest reasoning |
+| Model            | Size  | Speed           | Quality for this task            |
+| ---------------- | ----- | --------------- | -------------------------------- |
+| `llama3.2:3b`    | 2GB   | Fast (2-5s)     | Good for basic enhancement       |
+| `llama3.2`       | 4.7GB | Medium (5-10s)  | Good balance                     |
+| `mistral`        | 4.1GB | Medium (5-8s)   | Strong structured output         |
+| `llama3.1:8b`    | 4.7GB | Medium (5-10s)  | Best quality at reasonable speed |
+| `qwen2.5:7b`     | 4.4GB | Medium (5-10s)  | Excellent instruction following  |
+| `deepseek-r1:8b` | 4.9GB | Slower (10-20s) | Strongest reasoning              |
 
 Default recommendation: **`llama3.2`** — good enough, fast enough, runs on most machines (8GB RAM minimum).
 
@@ -215,10 +216,10 @@ Default recommendation: **`llama3.2`** — good enough, fast enough, runs on mos
 
 ## Risk assessment
 
-| Risk | Mitigation |
-| --- | --- |
-| Ollama not installed | Local-only fallback works perfectly; show install instructions on first visit |
-| Model produces invalid JSON | Parse with try/catch; fall back to local-only blueprint; retry once |
-| LLM adds time to analysis | Show two-phase progress: "Analyzing audio... Generating descriptions..." |
-| Users confused by provider options | Auto-detect by default; advanced users can override in settings |
-| CORS issues with localhost | Ollama allows CORS by default; document `OLLAMA_ORIGINS` env var if needed |
+| Risk                               | Mitigation                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| Ollama not installed               | Local-only fallback works perfectly; show install instructions on first visit |
+| Model produces invalid JSON        | Parse with try/catch; fall back to local-only blueprint; retry once           |
+| LLM adds time to analysis          | Show two-phase progress: "Analyzing audio... Generating descriptions..."      |
+| Users confused by provider options | Auto-detect by default; advanced users can override in settings               |
+| CORS issues with localhost         | Ollama allows CORS by default; document `OLLAMA_ORIGINS` env var if needed    |

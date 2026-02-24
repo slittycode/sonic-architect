@@ -114,7 +114,7 @@ describe('App integration flow', () => {
     localStorage.clear();
     vi.clearAllMocks();
   });
-  
+
   afterEach(() => {
     cleanup();
   });

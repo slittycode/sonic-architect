@@ -62,6 +62,14 @@ Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
   value: () => canvasContextStub,
 });
 
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  Object.defineProperty(Element.prototype, 'scrollIntoView', {
+    configurable: true,
+    writable: true,
+    value: () => {},
+  });
+}
+
 const storage = new Map<string, string>();
 
 Object.defineProperty(globalThis, 'localStorage', {

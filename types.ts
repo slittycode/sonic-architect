@@ -1,4 +1,3 @@
-
 export interface GlobalTelemetry {
   bpm: string;
   key: string;
@@ -67,7 +66,7 @@ export enum AnalysisStatus {
   UPLOADING = 'UPLOADING',
   ANALYZING = 'ANALYZING',
   COMPLETED = 'COMPLETED',
-  ERROR = 'ERROR'
+  ERROR = 'ERROR',
 }
 
 // Provider types
@@ -87,11 +86,11 @@ export interface AudioFeatures {
   key: { root: string; scale: string; confidence: number };
   spectralCentroidMean: number;
   rmsMean: number;
-  rmsProfile: number[];        // energy over time (for arrangement)
+  rmsProfile: number[]; // energy over time (for arrangement)
   spectralBands: SpectralBandEnergy[];
-  crestFactor: number;         // peak-to-RMS ratio (compression indicator)
+  crestFactor: number; // peak-to-RMS ratio (compression indicator)
   onsetCount: number;
-  onsetDensity: number;        // onsets per second
+  onsetDensity: number; // onsets per second
   duration: number;
   sampleRate: number;
   channels: number;

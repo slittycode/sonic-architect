@@ -11,7 +11,11 @@
     "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "qa:static": "pnpm run typecheck && pnpm run lint && pnpm run format:check",
+    "qa:test": "pnpm test",
+    "qa:review": "codex --full-auto exec \"Review this repository for correctness, security, performance, and maintainability. Prioritize working-tree changes first, then review the full codebase. Return severity-ranked findings with file references and concrete fixes.\"",
+    "qa:all": "pnpm run qa:static && pnpm run qa:test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { detectBPM } from '../bpmDetection';
 
-function createMockAudioBuffer(
-  channels: Float32Array[],
-  sampleRate: number,
-): AudioBuffer {
+function createMockAudioBuffer(channels: Float32Array[], sampleRate: number): AudioBuffer {
   const length = channels[0]?.length ?? 0;
   return {
     sampleRate,
@@ -18,7 +15,7 @@ function createMockAudioBuffer(
 function createPulseTrainAudio(
   bpm: number,
   durationSeconds: number,
-  sampleRate: number = 48_000,
+  sampleRate: number = 48_000
 ): AudioBuffer {
   const length = Math.floor(durationSeconds * sampleRate);
   const channel = new Float32Array(length);

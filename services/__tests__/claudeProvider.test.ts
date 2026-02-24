@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ReconstructionBlueprint } from '../../types';
-import {
-  mergeClaudeEnhancement,
-  parseClaudeEnhancement,
-} from '../claudeProvider';
+import { mergeClaudeEnhancement, parseClaudeEnhancement } from '../claudeProvider';
 
 function makeBlueprint(): ReconstructionBlueprint {
   return {
@@ -14,9 +11,7 @@ function makeBlueprint(): ReconstructionBlueprint {
       bpmConfidence: 0.9,
       keyConfidence: 0.8,
     },
-    arrangement: [
-      { timeRange: '0:00-0:30', label: 'Intro', description: 'Builds energy' },
-    ],
+    arrangement: [{ timeRange: '0:00-0:30', label: 'Intro', description: 'Builds energy' }],
     instrumentation: [
       {
         element: 'Bass',
@@ -47,9 +42,7 @@ function makeBlueprint(): ReconstructionBlueprint {
 
 describe('parseClaudeEnhancement', () => {
   it('parses JSON wrapped in markdown fences', () => {
-    const parsed = parseClaudeEnhancement(
-      '```json\n{"groove":"Enhanced groove"}\n```',
-    );
+    const parsed = parseClaudeEnhancement('```json\n{"groove":"Enhanced groove"}\n```');
     expect(parsed).toEqual({ groove: 'Enhanced groove' });
   });
 

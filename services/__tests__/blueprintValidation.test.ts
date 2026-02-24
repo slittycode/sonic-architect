@@ -77,7 +77,7 @@ describe('validateBlueprint', () => {
             confidence: 1.2,
           },
         ],
-      }),
+      })
     ).toThrowError(/chordProgression\[0\]\.confidence/i);
   });
 
@@ -85,7 +85,7 @@ describe('validateBlueprint', () => {
     expect(() =>
       validateBlueprint({
         telemetry: { bpm: '128' },
-      }),
+      })
     ).toThrowError(/invalid blueprint/i);
   });
 });

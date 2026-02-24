@@ -105,10 +105,7 @@ export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
 /**
  * Extract normalized waveform peaks for visualization.
  */
-export function extractWaveformPeaks(
-  audioBuffer: AudioBuffer,
-  numBars: number = 320,
-): number[] {
+export function extractWaveformPeaks(audioBuffer: AudioBuffer, numBars: number = 320): number[] {
   if (numBars <= 0) return [];
 
   const channelCount = audioBuffer.numberOfChannels;
@@ -181,10 +178,7 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
   const bandBinRanges = SPECTRAL_BANDS.map((band) => {
     const [lowHz, highHz] = band.range;
     const lowBin = Math.floor((lowHz * FRAME_SIZE) / sampleRate);
-    const highBin = Math.min(
-      Math.ceil((highHz * FRAME_SIZE) / sampleRate),
-      fftHalf - 1,
-    );
+    const highBin = Math.min(Math.ceil((highHz * FRAME_SIZE) / sampleRate), fftHalf - 1);
     return [lowBin, highBin] as const;
   });
 
@@ -262,9 +256,8 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
 
   // --- Aggregate metrics ---
   const rmsMean = numFrames > 0 ? totalRms / numFrames : 0;
-  const spectralCentroidMean = spectralCentroidCount > 0
-    ? spectralCentroidAcc / spectralCentroidCount
-    : 0;
+  const spectralCentroidMean =
+    spectralCentroidCount > 0 ? spectralCentroidAcc / spectralCentroidCount : 0;
 
   // Crest factor: peak-to-RMS ratio in dB
   const crestFactor = rmsMean > 0 ? 20 * Math.log10(peakAmplitude / rmsMean) : 0;
@@ -275,9 +268,7 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
   // --- Spectral band energies ---
   const spectralBands: SpectralBandEnergy[] = SPECTRAL_BANDS.map((band, i) => {
     const energyArr = bandEnergies[i];
-    const avg = energyArr.length > 0
-      ? energyArr.reduce((a, b) => a + b, 0) / energyArr.length
-      : 0;
+    const avg = energyArr.length > 0 ? energyArr.reduce((a, b) => a + b, 0) / energyArr.length : 0;
     const peak = bandPeaks[i];
 
     const avgDb = avg > 0 ? 20 * Math.log10(avg) : -100;

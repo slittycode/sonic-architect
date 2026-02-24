@@ -99,14 +99,14 @@ describe('firstTimeUser utilities', () => {
   describe('markAnalysisComplete', () => {
     it('marks first analysis as complete with timestamp', () => {
       const beforeTime = new Date().toISOString();
-      
+
       markAnalysisComplete();
 
       const state = getFirstTimeUserState();
       expect(state.hasCompletedAnalysis).toBe(true);
       expect(state.analysisCount).toBe(1);
       expect(state.firstAnalysisDate).not.toBeNull();
-      
+
       // Verify timestamp is recent
       const afterTime = new Date().toISOString();
       expect(new Date(state.firstAnalysisDate!).getTime()).toBeGreaterThanOrEqual(

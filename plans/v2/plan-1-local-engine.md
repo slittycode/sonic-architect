@@ -25,11 +25,11 @@ Client-side DSP solves all of these. BPM detection, key detection, spectral anal
 
 **Libraries to evaluate:**
 
-| Library | Size | Features | Browser support |
-| --- | --- | --- | --- |
-| [Meyda](https://meyda.js.org) | ~15KB | RMS, spectral centroid, MFCC, chroma, loudness | Excellent (Web Audio API) |
-| [Essentia.js](https://mtg.github.io/essentia.js/) | ~2MB WASM | BPM, key, onset, pitch, full MIR suite | Good (WASM) |
-| [aubiojs](https://github.com/nicholasgasior/aubiojs) | ~500KB WASM | BPM, pitch, onset | Good (WASM) |
+| Library                                              | Size        | Features                                       | Browser support           |
+| ---------------------------------------------------- | ----------- | ---------------------------------------------- | ------------------------- |
+| [Meyda](https://meyda.js.org)                        | ~15KB       | RMS, spectral centroid, MFCC, chroma, loudness | Excellent (Web Audio API) |
+| [Essentia.js](https://mtg.github.io/essentia.js/)    | ~2MB WASM   | BPM, key, onset, pitch, full MIR suite         | Good (WASM)               |
+| [aubiojs](https://github.com/nicholasgasior/aubiojs) | ~500KB WASM | BPM, pitch, onset                              | Good (WASM)               |
 
 **Recommendation:** Use **Meyda** for real-time spectral features (lightweight, perfect for visualizer) and **Essentia.js** for heavy-lifting analysis (BPM, key detection). Essentia.js can be loaded lazily only when analysis is triggered.
 
@@ -42,12 +42,12 @@ import Meyda from 'meyda';
 export interface AudioFeatures {
   bpm: number;
   key: { root: string; scale: string; confidence: number };
-  spectralCentroid: number[];       // per-frame
-  rms: number[];                    // per-frame (loudness envelope)
-  onsets: number[];                 // timestamps of transients
-  chroma: number[][];               // 12-bin chroma per frame
-  mfcc: number[][];                 // timbre fingerprint per frame
-  spectralRolloff: number[];        // brightness over time
+  spectralCentroid: number[]; // per-frame
+  rms: number[]; // per-frame (loudness envelope)
+  onsets: number[]; // timestamps of transients
+  chroma: number[][]; // 12-bin chroma per frame
+  mfcc: number[][]; // timbre fingerprint per frame
+  spectralRolloff: number[]; // brightness over time
   duration: number;
 }
 ```
@@ -55,12 +55,14 @@ export interface AudioFeatures {
 ### 1.2 — Build BPM and key detection pipeline
 
 **BPM detection** (Essentia.js `RhythmExtractor2013` or `PercivalBpmEstimator`):
+
 - Decode audio via Web Audio API `decodeAudioData`
 - Pass float32 PCM to Essentia WASM module
 - Return BPM + confidence score
 - Handle edge cases: variable tempo, half/double time
 
 **Key detection** (Essentia.js `KeyExtractor`):
+
 - Uses HPCP (Harmonic Pitch Class Profile) chroma features
 - Returns root note + scale (major/minor) + confidence
 - Map to standard notation (e.g., "F# Minor")
@@ -81,17 +83,18 @@ This replaces Gemini's hallucinated arrangement with objectively measurable stru
 
 Instead of asking an LLM to "name the instruments," analyze frequency band energy:
 
-| Band | Range | Typical instrument |
-| --- | --- | --- |
-| Sub bass | 20-80 Hz | Sub bass, 808 |
-| Low bass | 80-250 Hz | Bass guitar, kick body |
-| Low mids | 250-500 Hz | Warmth, body |
-| Mids | 500-2000 Hz | Vocals, synth leads, guitars |
-| Upper mids | 2-5 kHz | Presence, attack, snare crack |
-| Highs | 5-10 kHz | Hi-hats, cymbals, air |
-| Brilliance | 10-20 kHz | Shimmer, sibilance |
+| Band       | Range       | Typical instrument            |
+| ---------- | ----------- | ----------------------------- |
+| Sub bass   | 20-80 Hz    | Sub bass, 808                 |
+| Low bass   | 80-250 Hz   | Bass guitar, kick body        |
+| Low mids   | 250-500 Hz  | Warmth, body                  |
+| Mids       | 500-2000 Hz | Vocals, synth leads, guitars  |
+| Upper mids | 2-5 kHz     | Presence, attack, snare crack |
+| Highs      | 5-10 kHz    | Hi-hats, cymbals, air         |
+| Brilliance | 10-20 kHz   | Shimmer, sibilance            |
 
 For each band, report:
+
 - Average energy level (dB)
 - Peak energy and timestamp
 - Suggested Ableton device from a static knowledge base (e.g., high sub energy + clean sine shape = "Operator: sine osc, low-pass at 80Hz")
@@ -104,9 +107,21 @@ Build a static mapping from spectral characteristics to Ableton Live 12 device r
 // data/abletonDevices.ts
 export const DEVICE_MAP = {
   subBass: {
-    clean: { device: "Operator", preset: "Sine Sub", settings: "Osc A: Sine, Filter: LP 24dB @ 80Hz" },
-    distorted: { device: "Wavetable", preset: "Analog Sub", settings: "Osc: Basic Shapes > Square, Drive: 30%" },
-    reese: { device: "Wavetable", preset: "Reese Bass", settings: "2 Osc slightly detuned, Unison: 4 voices" }
+    clean: {
+      device: 'Operator',
+      preset: 'Sine Sub',
+      settings: 'Osc A: Sine, Filter: LP 24dB @ 80Hz',
+    },
+    distorted: {
+      device: 'Wavetable',
+      preset: 'Analog Sub',
+      settings: 'Osc: Basic Shapes > Square, Drive: 30%',
+    },
+    reese: {
+      device: 'Wavetable',
+      preset: 'Reese Bass',
+      settings: '2 Osc slightly detuned, Unison: 4 voices',
+    },
   },
   // ... mapped by frequency band + timbral quality
 };
@@ -117,6 +132,7 @@ This is deterministic and correct — no hallucination possible.
 ### 1.6 — FX chain detection from audio characteristics
 
 Detect processing artifacts from spectral analysis:
+
 - **Reverb:** RT60 estimate from impulse response analysis (onset tail decay)
 - **Compression:** Crest factor (peak-to-RMS ratio) — low crest = heavy compression
 - **Saturation/Distortion:** Harmonic content analysis (odd harmonics = clipping, even = tube warmth)
@@ -138,17 +154,17 @@ export interface AnalysisProvider {
 }
 
 export class LocalAnalysisProvider implements AnalysisProvider {
-  name = "Local DSP Engine";
+  name = 'Local DSP Engine';
   // Uses Meyda + Essentia.js — always available
 }
 
 export class OllamaProvider implements AnalysisProvider {
-  name = "Ollama (Local LLM)";
+  name = 'Ollama (Local LLM)';
   // Uses local analysis + Ollama for interpretive text — Plan 2
 }
 
 export class GeminiProvider implements AnalysisProvider {
-  name = "Gemini 1.5 Pro (Cloud)";
+  name = 'Gemini 1.5 Pro (Cloud)';
   // Current behavior — kept as opt-in for users with API keys
 }
 ```
@@ -167,8 +183,8 @@ export interface ReconstructionBlueprint {
   fxChain: FXChainItem[];
   secretSauce: SecretSauce;
   meta: {
-    provider: string;        // "local" | "ollama" | "gemini"
-    analysisTime: number;    // ms
+    provider: string; // "local" | "ollama" | "gemini"
+    analysisTime: number; // ms
     sampleRate: number;
     duration: number;
     channels: number;
@@ -213,10 +229,10 @@ Essentia.js WASM file should be loaded lazily via dynamic import to keep initial
 
 ## Risk assessment
 
-| Risk | Mitigation |
-| --- | --- |
-| Essentia.js WASM is ~2MB | Lazy load only on analysis trigger; show progress bar |
-| BPM detection can give half/double time | Show top 3 candidates; let user override |
-| Key detection less accurate on complex mixes | Show confidence; allow manual override |
-| No "secret sauce" without LLM | Use template: "Dominant technique: [detected artifact]. Try [Ableton device] with [settings]." |
-| Arrangement segmentation imprecise | Show energy curve visualization so users can see the segmentation logic |
+| Risk                                         | Mitigation                                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Essentia.js WASM is ~2MB                     | Lazy load only on analysis trigger; show progress bar                                          |
+| BPM detection can give half/double time      | Show top 3 candidates; let user override                                                       |
+| Key detection less accurate on complex mixes | Show confidence; allow manual override                                                         |
+| No "secret sauce" without LLM                | Use template: "Dominant technique: [detected artifact]. Try [Ableton device] with [settings]." |
+| Arrangement segmentation imprecise           | Show energy curve visualization so users can see the segmentation logic                        |

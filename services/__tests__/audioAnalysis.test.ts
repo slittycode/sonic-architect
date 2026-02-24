@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { extractWaveformPeaks } from '../audioAnalysis';
 
-function createMockAudioBuffer(
-  channels: Float32Array[],
-  sampleRate: number,
-): AudioBuffer {
+function createMockAudioBuffer(channels: Float32Array[], sampleRate: number): AudioBuffer {
   const length = channels[0]?.length ?? 0;
   return {
     sampleRate,
@@ -34,10 +31,8 @@ describe('extractWaveformPeaks', () => {
     expect(peaks).toHaveLength(64);
     expect(Math.max(...peaks)).toBeCloseTo(1, 5);
 
-    const firstHalfAvg =
-      peaks.slice(0, 32).reduce((sum, value) => sum + value, 0) / 32;
-    const secondHalfAvg =
-      peaks.slice(32).reduce((sum, value) => sum + value, 0) / 32;
+    const firstHalfAvg = peaks.slice(0, 32).reduce((sum, value) => sum + value, 0) / 32;
+    const secondHalfAvg = peaks.slice(32).reduce((sum, value) => sum + value, 0) / 32;
 
     expect(secondHalfAvg).toBeGreaterThan(firstHalfAvg);
   });

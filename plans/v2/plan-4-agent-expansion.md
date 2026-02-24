@@ -27,20 +27,20 @@ Use Essentia.js `PitchYinFFT` or `PitchMelodia` (from Plan 1's WASM module):
 ```typescript
 // services/pitchDetection.ts
 export interface DetectedNote {
-  pitch: number;       // MIDI note number (0-127)
-  frequency: number;   // Hz
-  startTime: number;   // seconds
-  duration: number;    // seconds
-  velocity: number;    // 0-127, derived from RMS at note onset
-  confidence: number;  // 0-1
+  pitch: number; // MIDI note number (0-127)
+  frequency: number; // Hz
+  startTime: number; // seconds
+  duration: number; // seconds
+  velocity: number; // 0-127, derived from RMS at note onset
+  confidence: number; // 0-1
 }
 
 export async function detectPitches(
   audioBuffer: AudioBuffer,
   options?: {
-    minFrequency?: number;   // default: 50 Hz (low bass)
-    maxFrequency?: number;   // default: 4000 Hz (soprano range)
-    hopSize?: number;        // default: 512 samples
+    minFrequency?: number; // default: 50 Hz (low bass)
+    maxFrequency?: number; // default: 4000 Hz (soprano range)
+    hopSize?: number; // default: 512 samples
     confidenceThreshold?: number; // default: 0.8
   }
 ): Promise<DetectedNote[]> {
@@ -64,11 +64,7 @@ Use `midi-writer-js` to convert detected notes to a standard MIDI file:
 // services/midiExport.ts
 import MidiWriter from 'midi-writer-js';
 
-export function createMidiFile(
-  notes: DetectedNote[],
-  bpm: number,
-  name: string
-): Blob {
+export function createMidiFile(notes: DetectedNote[], bpm: number, name: string): Blob {
   const track = new MidiWriter.Track();
   track.setTempo(bpm);
   track.addTrackName(name);
@@ -78,12 +74,14 @@ export function createMidiFile(
     const startTick = secondsToTicks(note.startTime, bpm);
     const durationTick = secondsToTicks(note.duration, bpm);
 
-    track.addEvent(new MidiWriter.NoteEvent({
-      pitch: midiNumberToNoteName(note.pitch),
-      velocity: note.velocity,
-      startTick,
-      duration: `T${durationTick}`,
-    }));
+    track.addEvent(
+      new MidiWriter.NoteEvent({
+        pitch: midiNumberToNoteName(note.pitch),
+        velocity: note.velocity,
+        startTick,
+        duration: `T${durationTick}`,
+      })
+    );
   }
 
   const writer = new MidiWriter.Writer([track]);
@@ -176,7 +174,7 @@ export function previewMidi(
     const gain = audioContext.createGain();
     osc.type = 'triangle'; // simple, pleasant tone
     osc.frequency.value = midiToFrequency(note.pitch);
-    gain.gain.value = note.velocity / 127 * 0.3;
+    gain.gain.value = (note.velocity / 127) * 0.3;
     osc.connect(gain).connect(audioContext.destination);
 
     const startTime = audioContext.currentTime + note.startTime;
@@ -186,7 +184,12 @@ export function previewMidi(
   }
 
   return {
-    stop: () => oscillators.forEach(o => { try { o.stop(); } catch {} })
+    stop: () =>
+      oscillators.forEach((o) => {
+        try {
+          o.stop();
+        } catch {}
+      }),
   };
 }
 ```

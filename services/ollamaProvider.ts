@@ -56,7 +56,7 @@ function parseEnhancement(raw: string): OllamaEnhancement | null {
 
 function mergeEnhancement(
   blueprint: ReconstructionBlueprint,
-  enhancement: OllamaEnhancement | null,
+  enhancement: OllamaEnhancement | null
 ): ReconstructionBlueprint {
   if (!enhancement) return blueprint;
 
@@ -99,10 +99,7 @@ function mergeEnhancement(
   }
 
   if (enhancement.secretSauce) {
-    if (
-      typeof enhancement.secretSauce.trick === 'string' &&
-      enhancement.secretSauce.trick.trim()
-    ) {
+    if (typeof enhancement.secretSauce.trick === 'string' && enhancement.secretSauce.trick.trim()) {
       merged.secretSauce.trick = enhancement.secretSauce.trick.trim();
     }
     if (
@@ -122,7 +119,7 @@ export class OllamaProvider implements AnalysisProvider {
 
   constructor(
     private readonly localProvider: LocalAnalysisProvider = new LocalAnalysisProvider(),
-    private readonly config: OllamaConfig = DEFAULT_OLLAMA_CONFIG,
+    private readonly config: OllamaConfig = DEFAULT_OLLAMA_CONFIG
   ) {}
 
   async isAvailable(): Promise<boolean> {

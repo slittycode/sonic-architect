@@ -11,9 +11,7 @@
 /**
  * Detect BPM from an AudioBuffer using onset-based autocorrelation.
  */
-export function detectBPM(
-  audioBuffer: AudioBuffer
-): { bpm: number; confidence: number } {
+export function detectBPM(audioBuffer: AudioBuffer): { bpm: number; confidence: number } {
   const sampleRate = audioBuffer.sampleRate;
   const channelData = audioBuffer.getChannelData(0);
 
@@ -49,7 +47,7 @@ export function detectBPM(
   // BPM range: 60–200 => period in frames
   const framesPerSecond = sampleRate / hopSize;
   const minLag = Math.floor(framesPerSecond * (60 / 200)); // lag for 200 BPM
-  const maxLag = Math.floor(framesPerSecond * (60 / 60));  // lag for 60 BPM
+  const maxLag = Math.floor(framesPerSecond * (60 / 60)); // lag for 60 BPM
   const clampedMaxLag = Math.min(maxLag, onsetSignal.length - 1);
 
   if (minLag >= clampedMaxLag || onsetSignal.length < clampedMaxLag) {
@@ -58,7 +56,7 @@ export function detectBPM(
 
   // Normalize onset signal
   const mean = onsetSignal.reduce((a, b) => a + b, 0) / onsetSignal.length;
-  const normalized = onsetSignal.map(v => v - mean);
+  const normalized = onsetSignal.map((v) => v - mean);
 
   // Compute autocorrelation for each candidate lag
   const correlations: { lag: number; value: number }[] = [];

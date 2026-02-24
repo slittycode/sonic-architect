@@ -61,7 +61,7 @@ async function readErrorMessage(response: Response): Promise<string> {
 
 function streamSseText(
   body: ReadableStream<Uint8Array>,
-  onText: (chunk: string) => void,
+  onText: (chunk: string) => void
 ): ReadableStream<string> {
   const decoder = new TextDecoder();
 
@@ -127,7 +127,7 @@ export class ClaudeChatService {
   private history: ChatMessage[] = [];
 
   constructor(
-    private readonly getBlueprint: (() => ReconstructionBlueprint | null) | null = null,
+    private readonly getBlueprint: (() => ReconstructionBlueprint | null) | null = null
   ) {}
 
   async sendMessage(text: string): Promise<ReadableStream<string>> {

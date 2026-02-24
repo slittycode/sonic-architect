@@ -12,33 +12,33 @@ describe('patchSmith', () => {
     rmsProfile: [],
     spectralBands: [
       { name: 'Sub Bass', rangeHz: [20, 80], averageDb: -10, peakDb: -5, dominance: 'dominant' },
-      { name: 'Highs', rangeHz: [5000, 10000], averageDb: -60, peakDb: -50, dominance: 'absent' }
+      { name: 'Highs', rangeHz: [5000, 10000], averageDb: -60, peakDb: -50, dominance: 'absent' },
     ],
     crestFactor: 15, // High crest factor -> short attack
     onsetCount: 10,
     onsetDensity: 2,
     duration: 5,
     sampleRate: 44100,
-    channels: 1
+    channels: 1,
   };
 
   it('calculates parameters correctly based on audio features', () => {
     const params = calculateSynthParams(mockFeatures);
-    
+
     // High crest factor -> fast attack
     expect(params.attack).toBeLessThan(0.01);
-    
+
     // Low Highs, High Sub Bass -> sine wave
     expect(params.waveform).toBe('sine');
     expect(params.operatorWave).toBe(0);
-    
+
     // Spectral centroid of 2000 -> cutoff is 2000Hz
     expect(params.cutoffHz).toBe(2000);
   });
 
   it('generates a valid JSON Vital patch', () => {
     const patchString = generateVitalPatch(mockFeatures);
-    
+
     // Should parse without throwing
     const parsed = JSON.parse(patchString);
     expect(parsed.plugin_version).toBe('1.5.5');
@@ -48,7 +48,7 @@ describe('patchSmith', () => {
 
   it('generates a valid XML Operator patch', () => {
     const xmlString = generateOperatorPatch(mockFeatures);
-    
+
     expect(xmlString).toContain('<?xml version="1.0" encoding="UTF-8"?>');
     expect(xmlString).toContain('<Ableton');
     expect(xmlString).toContain('<Operator>');

@@ -7,21 +7,21 @@
 
 ## What's kept from v1 plans (and why)
 
-| v1 item | Status | Reasoning |
-| --- | --- | --- |
-| API key check | **Dropped** | Plan 1 removes the hard Gemini dependency. Provider selection handles this generically. |
-| Blueprint validation | **Kept (modified)** | Still needed — local analysis and LLM both produce JSON that needs validation. |
-| Test suite | **Kept (expanded)** | More important now with multiple providers to test. |
-| File size limit increase | **Kept** | Still relevant for local analysis. |
-| Env documentation | **Dropped** | No env vars needed for default (local) mode. Ollama/Gemini docs go in provider settings UI. |
-| useEffect dependency fix | **Kept** | Real bug, easy fix. |
-| Error recovery UI | **Kept** | Still needed. |
-| Real waveform | **Kept (critical now)** | Plan 1 decodes real audio — the waveform visualizer must use it. |
-| ESLint + Prettier | **Kept** | Standard DX. |
-| Tailwind via build | **Kept** | CDN script tag is fragile. |
-| Blueprint export | **Kept (expanded)** | Now exports the richer local analysis data. |
-| Import map cleanup | **Kept** | Dead code should go. |
-| Loading state | **Kept** | Prevent double uploads. |
+| v1 item                  | Status                  | Reasoning                                                                                   |
+| ------------------------ | ----------------------- | ------------------------------------------------------------------------------------------- |
+| API key check            | **Dropped**             | Plan 1 removes the hard Gemini dependency. Provider selection handles this generically.     |
+| Blueprint validation     | **Kept (modified)**     | Still needed — local analysis and LLM both produce JSON that needs validation.              |
+| Test suite               | **Kept (expanded)**     | More important now with multiple providers to test.                                         |
+| File size limit increase | **Kept**                | Still relevant for local analysis.                                                          |
+| Env documentation        | **Dropped**             | No env vars needed for default (local) mode. Ollama/Gemini docs go in provider settings UI. |
+| useEffect dependency fix | **Kept**                | Real bug, easy fix.                                                                         |
+| Error recovery UI        | **Kept**                | Still needed.                                                                               |
+| Real waveform            | **Kept (critical now)** | Plan 1 decodes real audio — the waveform visualizer must use it.                            |
+| ESLint + Prettier        | **Kept**                | Standard DX.                                                                                |
+| Tailwind via build       | **Kept**                | CDN script tag is fragile.                                                                  |
+| Blueprint export         | **Kept (expanded)**     | Now exports the richer local analysis data.                                                 |
+| Import map cleanup       | **Kept**                | Dead code should go.                                                                        |
+| Loading state            | **Kept**                | Prevent double uploads.                                                                     |
 
 ---
 
@@ -74,32 +74,40 @@ const BlueprintSchema = z.object({
     bpmConfidence: z.number().optional(),
     keyConfidence: z.number().optional(),
   }),
-  arrangement: z.array(z.object({
-    timeRange: z.string(),
-    label: z.string(),
-    description: z.string(),
-  })),
-  instrumentation: z.array(z.object({
-    element: z.string(),
-    timbre: z.string(),
-    frequency: z.string(),
-    abletonDevice: z.string(),
-  })),
-  fxChain: z.array(z.object({
-    artifact: z.string(),
-    recommendation: z.string(),
-  })),
+  arrangement: z.array(
+    z.object({
+      timeRange: z.string(),
+      label: z.string(),
+      description: z.string(),
+    })
+  ),
+  instrumentation: z.array(
+    z.object({
+      element: z.string(),
+      timbre: z.string(),
+      frequency: z.string(),
+      abletonDevice: z.string(),
+    })
+  ),
+  fxChain: z.array(
+    z.object({
+      artifact: z.string(),
+      recommendation: z.string(),
+    })
+  ),
   secretSauce: z.object({
     trick: z.string(),
     execution: z.string(),
   }),
-  meta: z.object({
-    provider: z.string(),
-    analysisTime: z.number(),
-    sampleRate: z.number(),
-    duration: z.number(),
-    channels: z.number(),
-  }).optional(),
+  meta: z
+    .object({
+      provider: z.string(),
+      analysisTime: z.number(),
+      sampleRate: z.number(),
+      duration: z.number(),
+      channels: z.number(),
+    })
+    .optional(),
 });
 
 export function validateBlueprint(data: unknown): ReconstructionBlueprint {
@@ -117,14 +125,14 @@ pnpm add -D vitest @testing-library/react @testing-library/jest-dom jsdom
 
 **Test targets:**
 
-| Test file | What it covers |
-| --- | --- |
-| `__tests__/audioAnalysis.test.ts` | BPM detection accuracy with known test files |
-| `__tests__/blueprintValidation.test.ts` | Zod schema: valid/invalid/partial input |
-| `__tests__/providers.test.ts` | Provider fallback chain, Ollama availability check |
-| `__tests__/App.test.tsx` | File upload validation, error states, status transitions |
-| `__tests__/BlueprintDisplay.test.tsx` | Renders fixture blueprint, handles missing optional fields |
-| `__tests__/WaveformVisualizer.test.tsx` | Renders with/without audio data, peak extraction |
+| Test file                               | What it covers                                             |
+| --------------------------------------- | ---------------------------------------------------------- |
+| `__tests__/audioAnalysis.test.ts`       | BPM detection accuracy with known test files               |
+| `__tests__/blueprintValidation.test.ts` | Zod schema: valid/invalid/partial input                    |
+| `__tests__/providers.test.ts`           | Provider fallback chain, Ollama availability check         |
+| `__tests__/App.test.tsx`                | File upload validation, error states, status transitions   |
+| `__tests__/BlueprintDisplay.test.tsx`   | Renders fixture blueprint, handles missing optional fields |
+| `__tests__/WaveformVisualizer.test.tsx` | Renders with/without audio data, peak extraction           |
 
 ### 3.4 — Fix useEffect dependency (togglePlayback)
 
@@ -168,30 +176,38 @@ useEffect(() => {
 Add dismiss/retry/reset actions to the error block in App.tsx:
 
 ```tsx
-{error && (
-  <div className="mt-6 p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
-    <div className="flex items-center gap-3 text-red-200">
-      <AlertCircle className="w-5 h-5 text-red-500" />
-      <span className="text-sm flex-1">{error}</span>
-    </div>
-    <div className="flex gap-2 mt-3">
-      <button onClick={() => setError(null)}
-        className="text-xs px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700">
-        Dismiss
-      </button>
-      {lastFile && (
-        <button onClick={() => triggerAnalysis(lastFile)}
-          className="text-xs px-3 py-1.5 bg-blue-800 text-blue-200 rounded hover:bg-blue-700">
-          Retry Analysis
+{
+  error && (
+    <div className="mt-6 p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
+      <div className="flex items-center gap-3 text-red-200">
+        <AlertCircle className="w-5 h-5 text-red-500" />
+        <span className="text-sm flex-1">{error}</span>
+      </div>
+      <div className="flex gap-2 mt-3">
+        <button
+          onClick={() => setError(null)}
+          className="text-xs px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700"
+        >
+          Dismiss
         </button>
-      )}
-      <button onClick={resetAll}
-        className="text-xs px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700">
-        Start Over
-      </button>
+        {lastFile && (
+          <button
+            onClick={() => triggerAnalysis(lastFile)}
+            className="text-xs px-3 py-1.5 bg-blue-800 text-blue-200 rounded hover:bg-blue-700"
+          >
+            Retry Analysis
+          </button>
+        )}
+        <button
+          onClick={resetAll}
+          className="text-xs px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700"
+        >
+          Start Over
+        </button>
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 ### 3.6 — Blueprint export

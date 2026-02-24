@@ -2,67 +2,63 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const {
-  fixtureBlueprint,
-  localAnalyzeAudioBuffer,
-  ollamaIsAvailable,
-  fakeAudioBuffer,
-} = vi.hoisted(() => {
-  const fixtureBlueprintValue = {
-    telemetry: {
-      bpm: '128',
-      key: 'F# Minor',
-      groove: 'Steady groove',
-      bpmConfidence: 0.9,
-      keyConfidence: 0.8,
-    },
-    arrangement: [
-      {
-        timeRange: '0:00–0:30',
-        label: 'Intro',
-        description: 'Intro section',
+const { fixtureBlueprint, localAnalyzeAudioBuffer, ollamaIsAvailable, fakeAudioBuffer } =
+  vi.hoisted(() => {
+    const fixtureBlueprintValue = {
+      telemetry: {
+        bpm: '128',
+        key: 'F# Minor',
+        groove: 'Steady groove',
+        bpmConfidence: 0.9,
+        keyConfidence: 0.8,
       },
-    ],
-    instrumentation: [
-      {
-        element: 'Bass',
-        timbre: 'Warm',
-        frequency: '40-120Hz',
-        abletonDevice: 'Operator',
+      arrangement: [
+        {
+          timeRange: '0:00–0:30',
+          label: 'Intro',
+          description: 'Intro section',
+        },
+      ],
+      instrumentation: [
+        {
+          element: 'Bass',
+          timbre: 'Warm',
+          frequency: '40-120Hz',
+          abletonDevice: 'Operator',
+        },
+      ],
+      fxChain: [
+        {
+          artifact: 'Compression',
+          recommendation: 'Use Glue Compressor',
+        },
+      ],
+      secretSauce: {
+        trick: 'Saturation',
+        execution: 'Apply subtle drive',
       },
-    ],
-    fxChain: [
-      {
-        artifact: 'Compression',
-        recommendation: 'Use Glue Compressor',
+      meta: {
+        provider: 'local',
+        analysisTime: 120,
+        sampleRate: 48000,
+        duration: 10,
+        channels: 2,
       },
-    ],
-    secretSauce: {
-      trick: 'Saturation',
-      execution: 'Apply subtle drive',
-    },
-    meta: {
-      provider: 'local',
-      analysisTime: 120,
-      sampleRate: 48000,
-      duration: 10,
-      channels: 2,
-    },
-  };
+    };
 
-  return {
-    fixtureBlueprint: fixtureBlueprintValue,
-    localAnalyzeAudioBuffer: vi.fn(async () => fixtureBlueprintValue),
-    ollamaIsAvailable: vi.fn(async () => false),
-    fakeAudioBuffer: {
-      sampleRate: 48000,
-      numberOfChannels: 1,
-      duration: 10,
-      length: 480000,
-      getChannelData: () => new Float32Array(480000),
-    } as unknown as AudioBuffer,
-  };
-});
+    return {
+      fixtureBlueprint: fixtureBlueprintValue,
+      localAnalyzeAudioBuffer: vi.fn(async () => fixtureBlueprintValue),
+      ollamaIsAvailable: vi.fn(async () => false),
+      fakeAudioBuffer: {
+        sampleRate: 48000,
+        numberOfChannels: 1,
+        duration: 10,
+        length: 480000,
+        getChannelData: () => new Float32Array(480000),
+      } as unknown as AudioBuffer,
+    };
+  });
 
 vi.mock('../services/localProvider', () => {
   class LocalAnalysisProviderMock {
@@ -137,7 +133,7 @@ describe('App provider fallback', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Ollama not detected\. Using Local DSP Engine\./i),
+        screen.getByText(/Ollama not detected\. Using Local DSP Engine\./i)
       ).toBeInTheDocument();
     });
 

@@ -9,9 +9,7 @@ const fixtureBlueprint: ReconstructionBlueprint = {
     key: 'A minor',
     groove: '16th note swing',
   },
-  arrangement: [
-    { timeRange: '0:00-0:32', label: 'Intro', description: 'Filtered pad and kick' },
-  ],
+  arrangement: [{ timeRange: '0:00-0:32', label: 'Intro', description: 'Filtered pad and kick' }],
   instrumentation: [
     {
       element: 'Sub Bass',
@@ -20,9 +18,7 @@ const fixtureBlueprint: ReconstructionBlueprint = {
       abletonDevice: 'Operator, one oscillator, low pass',
     },
   ],
-  fxChain: [
-    { artifact: 'Tail reverb', recommendation: 'Reverb on return' },
-  ],
+  fxChain: [{ artifact: 'Tail reverb', recommendation: 'Reverb on return' }],
   secretSauce: {
     trick: 'Sidechain ducking',
     execution: 'Compressor on pad, sidechain from kick',

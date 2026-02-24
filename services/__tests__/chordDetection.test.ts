@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { detectChords } from '../chordDetection';
 
-function createMockAudioBuffer(
-  channels: Float32Array[],
-  sampleRate: number,
-): AudioBuffer {
+function createMockAudioBuffer(channels: Float32Array[], sampleRate: number): AudioBuffer {
   const length = channels[0]?.length ?? 0;
   return {
     sampleRate,
@@ -19,7 +16,7 @@ function synthHarmonicChord(
   frequencies: number[],
   length: number,
   sampleRate: number,
-  gain: number = 0.2,
+  gain: number = 0.2
 ): Float32Array {
   const output = new Float32Array(length);
   const attackSamples = Math.max(1, Math.floor(sampleRate * 0.01));
@@ -47,7 +44,7 @@ function synthHarmonicChord(
 function createChordProgressionAudio(
   chordFrequencies: number[][],
   segmentSeconds: number,
-  sampleRate: number = 48_000,
+  sampleRate: number = 48_000
 ): AudioBuffer {
   const segmentLength = Math.floor(segmentSeconds * sampleRate);
   const totalLength = segmentLength * chordFrequencies.length;
@@ -91,10 +88,7 @@ describe('detectChords', () => {
   });
 
   it('returns chords with valid structure', () => {
-    const buffer = createChordProgressionAudio(
-      [C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR],
-      1,
-    );
+    const buffer = createChordProgressionAudio([C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR], 1);
 
     const result = detectChords(buffer, 1, 1);
 
@@ -107,16 +101,13 @@ describe('detectChords', () => {
           root: expect.any(String),
           quality: expect.any(String),
           confidence: expect.any(Number),
-        }),
+        })
       );
     }
   });
 
   it('keeps confidence values between 0 and 1', () => {
-    const buffer = createChordProgressionAudio(
-      [C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR],
-      1,
-    );
+    const buffer = createChordProgressionAudio([C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR], 1);
 
     const result = detectChords(buffer, 1, 1);
 
@@ -138,8 +129,7 @@ describe('detectChords', () => {
     const hopSeconds = 1;
     const windowSamples = Math.floor(windowSeconds * sampleRate);
     const hopSamples = Math.floor(hopSeconds * sampleRate);
-    const rawWindowCount =
-      Math.floor((buffer.length - windowSamples) / hopSamples) + 1;
+    const rawWindowCount = Math.floor((buffer.length - windowSamples) / hopSamples) + 1;
 
     const result = detectChords(buffer, windowSeconds, hopSeconds);
 
@@ -149,17 +139,12 @@ describe('detectChords', () => {
   });
 
   it('uses " – " as the progression summary separator', () => {
-    const buffer = createChordProgressionAudio(
-      [C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR],
-      1,
-    );
+    const buffer = createChordProgressionAudio([C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR], 1);
 
     const result = detectChords(buffer, 1, 1);
     const uniqueInOrder = result.chords
       .map((entry) => entry.chord)
-      .filter(
-        (chord, index, all) => index === 0 || chord !== all[index - 1],
-      );
+      .filter((chord, index, all) => index === 0 || chord !== all[index - 1]);
 
     expect(uniqueInOrder.length).toBeGreaterThan(1);
     expect(result.progression).toContain(' – ');
@@ -167,43 +152,15 @@ describe('detectChords', () => {
   });
 
   it('emits chord symbols with valid root notes and suffixes', () => {
-    const validRoots = new Set([
-      'C',
-      'C#',
-      'D',
-      'D#',
-      'E',
-      'F',
-      'F#',
-      'G',
-      'G#',
-      'A',
-      'A#',
-      'B',
-    ]);
-    const validSuffixes = new Set([
-      '',
-      'm',
-      '7',
-      'maj7',
-      'm7',
-      'dim',
-      'aug',
-      'sus4',
-      'sus2',
-    ]);
+    const validRoots = new Set(['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']);
+    const validSuffixes = new Set(['', 'm', '7', 'maj7', 'm7', 'dim', 'aug', 'sus4', 'sus2']);
 
-    const buffer = createChordProgressionAudio(
-      [C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR],
-      1,
-    );
+    const buffer = createChordProgressionAudio([C_MAJOR, G_MAJOR, A_MINOR, F_MAJOR], 1);
     const result = detectChords(buffer, 1, 1);
 
     expect(result.chords.length).toBeGreaterThan(0);
     for (const entry of result.chords) {
-      const match = /^([A-G](?:#)?)(m|7|maj7|m7|dim|aug|sus4|sus2)?$/.exec(
-        entry.chord,
-      );
+      const match = /^([A-G](?:#)?)(m|7|maj7|m7|dim|aug|sus4|sus2)?$/.exec(entry.chord);
       expect(match).not.toBeNull();
       const root = match?.[1] ?? '';
       const suffix = match?.[2] ?? '';

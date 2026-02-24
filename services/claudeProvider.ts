@@ -69,7 +69,7 @@ export function parseClaudeEnhancement(raw: string): ClaudeEnhancement | null {
 
 export function mergeClaudeEnhancement(
   blueprint: ReconstructionBlueprint,
-  enhancement: ClaudeEnhancement | null,
+  enhancement: ClaudeEnhancement | null
 ): ReconstructionBlueprint {
   if (!enhancement) return blueprint;
 
@@ -89,9 +89,7 @@ export function mergeClaudeEnhancement(
   if (Array.isArray(enhancement.instrumentation)) {
     for (const update of enhancement.instrumentation) {
       if (!update?.element) continue;
-      const index = merged.instrumentation.findIndex(
-        (item) => item.element === update.element,
-      );
+      const index = merged.instrumentation.findIndex((item) => item.element === update.element);
       if (index === -1) continue;
       if (typeof update.timbre === 'string' && update.timbre.trim()) {
         merged.instrumentation[index].timbre = update.timbre.trim();
@@ -114,10 +112,7 @@ export function mergeClaudeEnhancement(
   }
 
   if (enhancement.secretSauce) {
-    if (
-      typeof enhancement.secretSauce.trick === 'string' &&
-      enhancement.secretSauce.trick.trim()
-    ) {
+    if (typeof enhancement.secretSauce.trick === 'string' && enhancement.secretSauce.trick.trim()) {
       merged.secretSauce.trick = enhancement.secretSauce.trick.trim();
     }
     if (
@@ -250,7 +245,7 @@ export class ClaudeAnalysisProvider implements AnalysisProvider {
   type = 'claude' as const;
 
   constructor(
-    private readonly localProvider: LocalAnalysisProvider = new LocalAnalysisProvider(),
+    private readonly localProvider: LocalAnalysisProvider = new LocalAnalysisProvider()
   ) {}
 
   async isAvailable(): Promise<boolean> {

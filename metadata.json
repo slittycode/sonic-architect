@@ -1,7 +1,5 @@
 {
   "name": "Sonic Architect: Ableton Deconstructor",
   "description": "A high-end audio engineering tool that analyzes tracks and generates precise Ableton Live 12 reconstruction blueprints.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "requestFramePermissions": ["microphone"]
 }

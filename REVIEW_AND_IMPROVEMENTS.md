@@ -26,7 +26,6 @@ Sonic Architect is a React + Vite + Gemini 1.5 Pro web app that analyzes uploade
 | **Blueprint validation** | Gemini can return JSON that doesn't match [types.ts](types.ts) (e.g. missing or differently named keys). | After `JSON.parse` in [geminiService.ts](services/geminiService.ts), validate shape (e.g. required `telemetry`, `arrangement`, `instrumentation`, `fxChain`, `secretSauce`) and normalize or throw a clear error so the UI doesn't crash.                                   |
 | **Tests**                | No unit or integration tests.                                                                            | Add a minimal test setup (e.g. Vitest + React Testing Library). Start with: (1) parsing/validation logic in geminiService, (2) App file-validation and error states, (3) BlueprintDisplay with a fixture blueprint.                                                         |
 
-
 ### Important
 
 | Area                         | Issue                                                                                                                  | Recommendation                                                                                                                                                                                                       |
@@ -38,18 +37,16 @@ Sonic Architect is a React + Vite + Gemini 1.5 Pro web app that analyzes uploade
 | **Error recovery**           | After an analysis error, user must upload again; no explicit "retry" or "clear error" action.                          | Add a "Try again" or "Dismiss" on the error block and optionally a "Reset" to clear file and blueprint and return to idle.                                                                                           |
 | **Analyzer file size limit** | Limit is 10MB in [App.tsx](App.tsx) (`MAX_FILE_SIZE`). Users may want to analyze longer stems or full tracks.          | Increase the limit (e.g. to 50MB or 100MB) in [App.tsx](App.tsx). Optionally make it configurable via env (e.g. `VITE_MAX_UPLOAD_MB`) and keep a sensible default; ensure the error message shows the current limit. |
 
-
 ### Suggestions
 
 | Area                      | Suggestion                                                                                                                                                                                                                         |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **index.html import map** | [index.html](index.html) includes an import map (esm.sh). With Vite, the app is bundled, so this may be for AI Studio or another host. Document when the import map is used vs Vite build, or remove if unused to avoid confusion. |
 | **Tailwind**              | Tailwind is loaded from CDN in index.html. For build-size and consistency, consider installing `tailwindcss` and PostCSS and building CSS in the Vite pipeline.                                                                    |
-| **Blueprint export**      | Allow downloading the blueprint as JSON (and optionally a readable report) for use in Ableton or other tools.                                                                                                                   |
+| **Blueprint export**      | Allow downloading the blueprint as JSON (and optionally a readable report) for use in Ableton or other tools.                                                                                                                      |
 | **Loading state**         | Consider disabling "Import Stem" or showing a spinner during analysis to prevent double uploads.                                                                                                                                   |
 | **Verification**          | Add a short note in README or a `verification/README.md` on how to run the Playwright scripts (e.g. `npm run dev` then `python verification/verify_shortcuts.py`).                                                                 |
 | **Footer**                | Update "© 2024" when shipping; consider "Reference Model: Gemini 1.5 Pro" only in dev or a small "About" section.                                                                                                                  |
-
 
 ---
 

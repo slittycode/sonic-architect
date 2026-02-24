@@ -6,10 +6,7 @@ export interface ChordProgressionResult {
   confidence: number;
 }
 
-const NOTE_NAMES = [
-  'C', 'C#', 'D', 'D#', 'E', 'F',
-  'F#', 'G', 'G#', 'A', 'A#', 'B',
-];
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 interface ChordTemplate {
   name: string;
@@ -85,7 +82,7 @@ function computeWindowChroma(
   data: Float32Array,
   start: number,
   windowSize: number,
-  sampleRate: number,
+  sampleRate: number
 ): number[] {
   const chroma = new Float64Array(12);
   const end = Math.min(start + windowSize, data.length);
@@ -184,7 +181,7 @@ function formatTime(seconds: number): string {
 export function detectChords(
   audioBuffer: AudioBuffer,
   windowSeconds: number = 2,
-  hopSeconds: number = 1,
+  hopSeconds: number = 1
 ): ChordProgressionResult {
   const sampleRate = audioBuffer.sampleRate;
   const channelData = audioBuffer.getChannelData(0);
@@ -199,11 +196,7 @@ export function detectChords(
 
   const rawChords: { time: number; match: ChordMatch }[] = [];
 
-  for (
-    let offset = 0;
-    offset + windowSamples <= channelData.length;
-    offset += hopSamples
-  ) {
+  for (let offset = 0; offset + windowSamples <= channelData.length; offset += hopSamples) {
     let rmsSum = 0;
     const stride = Math.max(1, Math.floor(windowSamples / 512));
     for (let i = 0; i < windowSamples; i += stride) {
@@ -214,12 +207,7 @@ export function detectChords(
 
     if (rms < 0.005) continue;
 
-    const chroma = computeWindowChroma(
-      channelData,
-      offset,
-      windowSamples,
-      sampleRate,
-    );
+    const chroma = computeWindowChroma(channelData, offset, windowSamples, sampleRate);
     const match = matchChord(chroma);
 
     rawChords.push({
@@ -243,18 +231,13 @@ export function detectChords(
   for (let i = 1; i < rawChords.length; i++) {
     const { match, time } = rawChords[i];
 
-    if (
-      match.root === currentRoot &&
-      match.template.name === currentTemplate.name
-    ) {
+    if (match.root === currentRoot && match.template.name === currentTemplate.name) {
       segmentEnd = time + windowSeconds;
       confidenceSum += match.similarity;
       count++;
     } else {
       merged.push({
-        timeRange: `${formatTime(segmentStart)}–${formatTime(
-          Math.min(segmentEnd, duration),
-        )}`,
+        timeRange: `${formatTime(segmentStart)}–${formatTime(Math.min(segmentEnd, duration))}`,
         chord: `${NOTE_NAMES[currentRoot]}${currentTemplate.suffix}`,
         root: NOTE_NAMES[currentRoot],
         quality: currentTemplate.name,
@@ -271,9 +254,7 @@ export function detectChords(
   }
 
   merged.push({
-    timeRange: `${formatTime(segmentStart)}–${formatTime(
-      Math.min(segmentEnd, duration),
-    )}`,
+    timeRange: `${formatTime(segmentStart)}–${formatTime(Math.min(segmentEnd, duration))}`,
     chord: `${NOTE_NAMES[currentRoot]}${currentTemplate.suffix}`,
     root: NOTE_NAMES[currentRoot],
     quality: currentTemplate.name,
@@ -282,10 +263,7 @@ export function detectChords(
 
   const uniqueSequence: string[] = [];
   for (const chord of merged) {
-    if (
-      uniqueSequence.length === 0 ||
-      uniqueSequence[uniqueSequence.length - 1] !== chord.chord
-    ) {
+    if (uniqueSequence.length === 0 || uniqueSequence[uniqueSequence.length - 1] !== chord.chord) {
       uniqueSequence.push(chord.chord);
     }
   }

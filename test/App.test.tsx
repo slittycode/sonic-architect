@@ -34,4 +34,16 @@ describe('App', () => {
 
     expect(await screen.findByText(/invalid file type/i)).toBeInTheDocument();
   });
+
+  it('toggles the Claude chat panel from the toolbar', async () => {
+    render(<App />);
+    const toggle = screen.getByRole('button', { name: /toggle claude chat/i });
+
+    expect(screen.queryByText('Claude Assistant')).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(screen.getByText('Claude Assistant')).toBeInTheDocument();
+
+    await userEvent.click(toggle);
+    expect(screen.queryByText('Claude Assistant')).not.toBeInTheDocument();
+  });
 });

@@ -25,12 +25,15 @@ import { generateMixReport } from './mixDoctor';
  * Segment the RMS energy profile into arrangement sections.
  * Uses energy change-points to identify structural sections.
  */
-function detectArrangement(
-  rmsProfile: number[],
-  duration: number
-): ArrangementSection[] {
+function detectArrangement(rmsProfile: number[], duration: number): ArrangementSection[] {
   if (rmsProfile.length === 0) {
-    return [{ timeRange: `0:00–${formatTime(duration)}`, label: 'Full Track', description: 'Unable to segment — audio too short.' }];
+    return [
+      {
+        timeRange: `0:00–${formatTime(duration)}`,
+        label: 'Full Track',
+        description: 'Unable to segment — audio too short.',
+      },
+    ];
   }
 
   // Smooth the RMS profile to reduce noise
@@ -39,7 +42,11 @@ function detectArrangement(
   for (let i = 0; i < rmsProfile.length; i++) {
     let sum = 0;
     let count = 0;
-    for (let j = Math.max(0, i - windowSize); j <= Math.min(rmsProfile.length - 1, i + windowSize); j++) {
+    for (
+      let j = Math.max(0, i - windowSize);
+      j <= Math.min(rmsProfile.length - 1, i + windowSize);
+      j++
+    ) {
       sum += rmsProfile[j];
       count++;
     }
@@ -48,7 +55,7 @@ function detectArrangement(
 
   // Normalize to 0-1
   const maxRms = Math.max(...smoothed);
-  const normalized = maxRms > 0 ? smoothed.map(v => v / maxRms) : smoothed;
+  const normalized = maxRms > 0 ? smoothed.map((v) => v / maxRms) : smoothed;
 
   // Find significant energy changes (change-point detection)
   const changePoints: number[] = [0]; // Always start at 0
@@ -104,7 +111,16 @@ function detectArrangement(
 
   // Label each section based on energy level
   const sections: ArrangementSection[] = [];
-  const sectionLabels = ['Intro', 'Build', 'Main', 'Chorus', 'Breakdown', 'Drop', 'Bridge', 'Outro'];
+  const sectionLabels = [
+    'Intro',
+    'Build',
+    'Main',
+    'Chorus',
+    'Breakdown',
+    'Drop',
+    'Bridge',
+    'Outro',
+  ];
 
   for (let i = 0; i < changePoints.length; i++) {
     const startFrame = changePoints[i];
@@ -138,13 +154,14 @@ function detectArrangement(
     }
 
     // Energy description
-    const energyDesc = sectionEnergy > 0.75
-      ? 'High energy — full arrangement, all elements active.'
-      : sectionEnergy > 0.5
-        ? 'Medium-high energy — core elements present, building momentum.'
-        : sectionEnergy > 0.3
-          ? 'Medium energy — reduced arrangement, focus on key elements.'
-          : 'Low energy — sparse arrangement, atmospheric or transitional.';
+    const energyDesc =
+      sectionEnergy > 0.75
+        ? 'High energy — full arrangement, all elements active.'
+        : sectionEnergy > 0.5
+          ? 'Medium-high energy — core elements present, building momentum.'
+          : sectionEnergy > 0.3
+            ? 'Medium energy — reduced arrangement, focus on key elements.'
+            : 'Low energy — sparse arrangement, atmospheric or transitional.';
 
     sections.push({
       timeRange: `${formatTime(startTime)}–${formatTime(endTime)}`,
@@ -173,7 +190,11 @@ function formatTime(seconds: number): string {
 /**
  * Describe groove from onset density and BPM
  */
-function describeGroove(features: { onsetDensity: number; bpm: number; crestFactor: number }): string {
+function describeGroove(features: {
+  onsetDensity: number;
+  bpm: number;
+  crestFactor: number;
+}): string {
   const { onsetDensity, bpm, crestFactor } = features;
 
   let groove = '';
@@ -197,7 +218,7 @@ function describeGroove(features: { onsetDensity: number; bpm: number; crestFact
 export function buildLocalBlueprint(
   features: AudioFeatures,
   analysisTime: number,
-  provider: 'local' | 'ollama' = 'local',
+  provider: 'local' | 'ollama' = 'local'
 ): ReconstructionBlueprint {
   const arrangement = detectArrangement(features.rmsProfile, features.duration);
   const instrumentation = getInstrumentRecommendations(features.spectralBands);
@@ -205,7 +226,7 @@ export function buildLocalBlueprint(
   const secretSauce = getSecretSauce(features);
   const patches = {
     vital: generateVitalPatch(features),
-    operator: generateOperatorPatch(features)
+    operator: generateOperatorPatch(features),
   };
   const mixReport = generateMixReport(features); // Use default EDM profile
 
@@ -219,10 +240,16 @@ export function buildLocalBlueprint(
     },
     arrangement,
     instrumentation,
-    fxChain: fxChain.length > 0 ? fxChain : [{
-      artifact: 'Balanced dynamics and spectrum',
-      recommendation: 'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
-    }],
+    fxChain:
+      fxChain.length > 0
+        ? fxChain
+        : [
+            {
+              artifact: 'Balanced dynamics and spectrum',
+              recommendation:
+                'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
+            },
+          ],
     secretSauce,
     patches,
     mixReport,
@@ -251,13 +278,16 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     return this.analyzeAudioBuffer(audioBuffer, signal);
   }
 
-  async analyzeAudioBuffer(audioBuffer: AudioBuffer, signal?: AbortSignal): Promise<ReconstructionBlueprint> {
+  async analyzeAudioBuffer(
+    audioBuffer: AudioBuffer,
+    signal?: AbortSignal
+  ): Promise<ReconstructionBlueprint> {
     const startTime = performance.now();
 
     // Extract features
     const features = extractAudioFeatures(audioBuffer);
     signal?.throwIfAborted();
-    
+
     const analysisTime = Math.round(performance.now() - startTime);
     return buildLocalBlueprint(features, analysisTime, 'local');
   }

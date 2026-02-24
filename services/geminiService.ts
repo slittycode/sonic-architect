@@ -1,7 +1,6 @@
-
-import { GoogleGenAI } from "@google/genai";
-import { AnalysisProvider, ReconstructionBlueprint } from "../types";
-import { validateBlueprint } from "./blueprintValidation";
+import { GoogleGenAI } from '@google/genai';
+import { AnalysisProvider, ReconstructionBlueprint } from '../types';
+import { validateBlueprint } from './blueprintValidation';
 
 /**
  * Gemini Provider — Cloud-based multimodal analysis.
@@ -19,7 +18,9 @@ export class GeminiProvider implements AnalysisProvider {
   async analyze(file: File): Promise<ReconstructionBlueprint> {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('Missing API key. Set GEMINI_API_KEY in .env.local to use the Gemini provider.');
+      throw new Error(
+        'Missing API key. Set GEMINI_API_KEY in .env.local to use the Gemini provider.'
+      );
     }
 
     const startTime = performance.now();
@@ -97,32 +98,29 @@ async function analyzeAudioWithGemini(
     model: 'gemini-1.5-pro',
     contents: [
       {
-        parts: [
-          { inlineData: { data: base64Audio, mimeType } },
-          { text: prompt }
-        ]
-      }
+        parts: [{ inlineData: { data: base64Audio, mimeType } }, { text: prompt }],
+      },
     ],
     config: {
-      responseMimeType: "application/json",
-    }
+      responseMimeType: 'application/json',
+    },
   });
 
-  const text = response.text || "{}";
+  const text = response.text || '{}';
   const cleanedText = text.replace(/```json\n|\n```/g, '').replace(/```/g, '');
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleanedText);
   } catch {
-    console.error("Failed to parse Gemini response as JSON:", text);
-    throw new Error("Could not parse analysis results. Please try again.");
+    console.error('Failed to parse Gemini response as JSON:', text);
+    throw new Error('Could not parse analysis results. Please try again.');
   }
 
   try {
     return validateBlueprint(parsed);
   } catch (error) {
-    console.error("Gemini response failed blueprint validation:", error);
-    throw new Error("Invalid analysis result; please try again.");
+    console.error('Gemini response failed blueprint validation:', error);
+    throw new Error('Invalid analysis result; please try again.');
   }
 }
 
