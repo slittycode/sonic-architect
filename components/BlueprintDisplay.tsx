@@ -4,6 +4,7 @@ import { ReconstructionBlueprint } from '../types';
 import MixDoctorPanel from './MixDoctorPanel';
 import SpectralAreaChart from './SpectralAreaChart';
 import SpectralHeatmap from './SpectralHeatmap';
+import EnhancedAnalysisPanel from './EnhancedAnalysisPanel';
 
 interface BlueprintDisplayProps {
   blueprint: ReconstructionBlueprint;
@@ -550,6 +551,9 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
 
       {/* Mix Doctor Dashboard */}
       {blueprint.mixReport && <MixDoctorPanel report={blueprint.mixReport} />}
+
+      {/* Enhanced Analysis Panel */}
+      <EnhancedAnalysisPanel telemetry={blueprint.telemetry} />
     </>
   );
 };

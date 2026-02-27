@@ -16,12 +16,15 @@
  * while maintaining backward compatibility.
  */
 
-import { AudioFeatures, SpectralBandEnergy } from '../types';
+import { AudioFeatures, SpectralBandEnergy, DetectedNote } from '../types';
 import { GenreClassification } from './genreClassifier';
 import { detectSidechainPump } from './sidechainDetection';
 import { analyzeBassDecay, BassDecayResult, SwingResult, detectSwing } from './bassAnalysis';
 import { detectAcidPattern, AcidDetectionResult } from './acidDetection';
 import { analyzeReverb, ReverbAnalysisResult } from './reverbAnalysis';
+import { analyzeKickDistortion, KickAnalysisResult } from './kickAnalysis';
+import { detectSupersaw, SupersawDetectionResult } from './supersawDetection';
+import { detectVocals, VocalDetectionResult } from './vocalDetection';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ENHANCED GENRE SIGNATURES - 25+ Electronic Subgenres
@@ -45,6 +48,8 @@ interface EnhancedGenreSignature {
   bassDecay: [number, number];
   /** RT60 reverb time in seconds — optional, for wet/dry genre discrimination */
   rt60?: [number, number];
+  /** Kick distortion (THD) — optional, for hard/industrial discrimination */
+  kickDistortion?: [number, number];
   /** Stereo width preference (optional) */
   msRatio?: [number, number];
 }
@@ -199,6 +204,7 @@ const ENHANCED_SIGNATURES: EnhancedGenreSignature[] = [
     spectralCentroid: [1800, 5000],
     sidechainStrength: [0.25, 0.55],
     bassDecay: [0.4, 0.8],
+    kickDistortion: [0.2, 0.6], // distorted kicks
   },
   {
     id: 'hard-techno',
@@ -210,6 +216,7 @@ const ENHANCED_SIGNATURES: EnhancedGenreSignature[] = [
     sidechainStrength: [0.3, 0.6],
     bassDecay: [0.4, 0.75],
     rt60: [0.1, 0.4],
+    kickDistortion: [0.15, 0.5], // moderately distorted kicks
   },
   {
     id: 'acid-techno',
@@ -493,6 +500,18 @@ export interface EnhancedGenreClassification extends GenreClassification {
   reverbDetectionResult: ReverbAnalysisResult | null;
   /** Reverb analysis summary for telemetry */
   reverbAnalysis: { rt60: number; isWet: boolean; tailEnergyRatio: number } | null;
+  /** Kick drum distortion analysis results */
+  kickDetectionResult: KickAnalysisResult | null;
+  /** Kick analysis summary for telemetry */
+  kickAnalysis: { isDistorted: boolean; thd: number; harmonicRatio: number } | null;
+  /** Supersaw detection results */
+  supersawDetectionResult: SupersawDetectionResult | null;
+  /** Supersaw analysis summary for telemetry */
+  supersawAnalysis: { isSupersaw: boolean; confidence: number; voiceCount: number } | null;
+  /** Vocal detection results */
+  vocalDetectionResult: VocalDetectionResult | null;
+  /** Vocal analysis summary for telemetry */
+  vocalAnalysis: { hasVocals: boolean; confidence: number; vocalEnergyRatio: number } | null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -505,19 +524,29 @@ export interface EnhancedGenreClassification extends GenreClassification {
  * @param features - Audio features from extractAudioFeatures()
  * @param audioBuffer - Raw audio buffer for sidechain/bass analysis
  * @param beatPositions - Optional beat positions for swing detection
+ * @param notes - Optional detected notes from Basic Pitch for supersaw detection
  */
 export async function classifyGenreEnhanced(
   features: AudioFeatures,
   audioBuffer: AudioBuffer,
-  beatPositions?: number[]
+  beatPositions?: number[],
+  notes?: DetectedNote[]
 ): Promise<EnhancedGenreClassification> {
-  // Run specialized analyses
-  const [sidechainResult, bassResult, acidResult, reverbResult] = await Promise.all([
-    Promise.resolve(detectSidechainPump(audioBuffer, features.bpm)),
-    Promise.resolve(analyzeBassDecay(audioBuffer, features.bpm)),
-    Promise.resolve(detectAcidPattern(audioBuffer, features.bpm)),
-    Promise.resolve(analyzeReverb(audioBuffer, features.bpm)),
-  ]);
+  // Run specialized analyses in parallel
+  const [sidechainResult, bassResult, acidResult, reverbResult, kickResult, vocalResult] =
+    await Promise.all([
+      Promise.resolve(detectSidechainPump(audioBuffer, features.bpm)),
+      Promise.resolve(analyzeBassDecay(audioBuffer, features.bpm)),
+      Promise.resolve(detectAcidPattern(audioBuffer, features.bpm)),
+      Promise.resolve(analyzeReverb(audioBuffer, features.bpm)),
+      Promise.resolve(analyzeKickDistortion(audioBuffer, features.bpm)),
+      Promise.resolve(detectVocals(audioBuffer, features.mfcc)),
+    ]);
+
+  // Supersaw detection (requires notes from Basic Pitch)
+  const supersawResult = notes && notes.length > 0
+    ? detectSupersaw(notes, features.spectralComplexity)
+    : { isSupersaw: false, confidence: 0, voiceCount: 0, avgDetuneCents: 0, spectralComplexity: 0 };
 
   // Swing detection if beat positions available
   const swingResult = beatPositions && beatPositions.length >= 8
@@ -557,6 +586,12 @@ export async function classifyGenreEnhanced(
       weights.rt60 = 0.5;
     }
 
+    // Optional kick distortion scoring (for hard/industrial techno)
+    if (sig.kickDistortion) {
+      rawScores.kickDistortion = rangeScore(kickResult.thd, sig.kickDistortion);
+      weights.kickDistortion = 0.6;
+    }
+
     const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
 
     let weightedScore = Object.keys(weights).reduce((sum, key) => {
@@ -566,6 +601,14 @@ export async function classifyGenreEnhanced(
     // Acid boost: if acid-techno signature and acid detected, boost score
     if (sig.id === 'acid-techno' && acidResult.isAcid) {
       weightedScore = Math.min(1.0, weightedScore * 1.3);
+    }
+
+    // Trance boost: if trance/progressive and supersaw detected, boost score
+    if (
+      (sig.id === 'trance' || sig.id === 'psytrance' || sig.id === 'progressive-house') &&
+      supersawResult.isSupersaw
+    ) {
+      weightedScore = Math.min(1.0, weightedScore * 1.2);
     }
 
     scores.push({ genre: sig.id, score: weightedScore, rawScores });
@@ -612,6 +655,24 @@ export async function classifyGenreEnhanced(
       rt60: reverbResult.rt60,
       isWet: reverbResult.isWet,
       tailEnergyRatio: reverbResult.tailEnergyRatio,
+    },
+    kickDetectionResult: kickResult,
+    kickAnalysis: {
+      isDistorted: kickResult.isDistorted,
+      thd: kickResult.thd,
+      harmonicRatio: kickResult.harmonicRatio,
+    },
+    supersawDetectionResult: supersawResult,
+    supersawAnalysis: {
+      isSupersaw: supersawResult.isSupersaw,
+      confidence: supersawResult.confidence,
+      voiceCount: supersawResult.voiceCount,
+    },
+    vocalDetectionResult: vocalResult,
+    vocalAnalysis: {
+      hasVocals: vocalResult.hasVocals,
+      confidence: vocalResult.confidence,
+      vocalEnergyRatio: vocalResult.vocalEnergyRatio,
     },
   };
 }

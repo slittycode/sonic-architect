@@ -29,6 +29,7 @@ import {
 } from './genreClassifierEnhanced';
 import { separateHarmonicPercussive, wrapAsAudioBuffer } from './hpss';
 import { extractEssentiaFeatures } from './essentiaFeatures';
+import { detectPolyphonic } from './polyphonicPitch';
 
 /**
  * Segment the RMS energy profile into arrangement sections.
@@ -268,6 +269,9 @@ export function buildLocalBlueprint(
         swingAnalysis: enhancedGenreResult.swingAnalysis || undefined,
         acidAnalysis: enhancedGenreResult.acidAnalysis || undefined,
         reverbAnalysis: enhancedGenreResult.reverbAnalysis || undefined,
+        kickAnalysis: enhancedGenreResult.kickAnalysis || undefined,
+        supersawAnalysis: enhancedGenreResult.supersawAnalysis || undefined,
+        vocalAnalysis: enhancedGenreResult.vocalAnalysis || undefined,
       }),
     },
     arrangement,
@@ -353,12 +357,19 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     const beatResult = trackBeats(audioBuffer, features.bpm);
     signal?.throwIfAborted();
 
+    // Polyphonic pitch detection for supersaw analysis (lazy, non-blocking)
+    const polyphonicNotes = await detectPolyphonic(audioBuffer, features.bpm)
+      .then((r) => r.notes)
+      .catch(() => []);
+    signal?.throwIfAborted();
+
     // Enhanced genre classification with sidechain/bass decay analysis
     // This runs in parallel with beat tracking for efficiency
     const enhancedGenreResult = await classifyGenreEnhanced(
       features,
       audioBuffer,
-      beatResult.beats
+      beatResult.beats,
+      polyphonicNotes
     );
     signal?.throwIfAborted();
 

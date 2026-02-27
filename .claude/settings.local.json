@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git check-ignore:*)",
+      "Bash(git:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm vitest:*)",
+      "Bash(pnpm run:*)",
+      "Bash(pnpm build:*)",
+      "Bash(npm view:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm pack:*)",
+      "Bash(tar -xzf spotify-basic-pitch-1.0.1.tgz)",
+      "Bash(pnpm add:*)",
+      "Bash(do git:*)",
+      "mcp__fetch__fetch",
+      "WebFetch(domain:ai.google.dev)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "Bash(pnpm test:*)",
+      "Bash(npm info:*)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Bash(rm:*)"
+    ]
+  }
+}

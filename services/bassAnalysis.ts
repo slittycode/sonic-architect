@@ -24,8 +24,6 @@ export interface BassDecayResult {
   transientCount: number;
 }
 
-const BASS_LOW_HZ = 20;
-const BASS_HIGH_HZ = 150;
 const DECAY_THRESHOLD_DB = -6; // Measure decay to -6dB from peak
 const MAX_DECAY_MS = 2000; // Cap at 2 seconds
 
@@ -151,7 +149,7 @@ function findBassOnsets(
   const minOnsetDistance = Math.floor((beatDurationMs * 0.25 / 1000) * sampleRate); // ~1/16th note
 
   let prevEnergy = 0;
-  const threshold = 0.005; // Onset threshold
+  const threshold = 0.005;
   let lastOnset = -minOnsetDistance;
 
   for (let i = 0; i + frameSize < bassSignal.length; i += hopSize) {

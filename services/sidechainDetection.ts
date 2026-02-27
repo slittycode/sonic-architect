@@ -23,8 +23,6 @@ export interface SidechainAnalysisResult {
   duckingRatio: number;
 }
 
-const SUB_BASS_LOW = 20;
-const SUB_BASS_HIGH = 80;
 const MIN_PUMP_PERIOD_MS = 300;  // ~200 BPM max
 const MAX_PUMP_PERIOD_MS = 1500; // ~40 BPM min
 

@@ -54,6 +54,24 @@ export interface GlobalTelemetry {
     isWet: boolean;
     tailEnergyRatio: number;
   };
+  /** Kick drum distortion analysis. */
+  kickAnalysis?: {
+    isDistorted: boolean;
+    thd: number;
+    harmonicRatio: number;
+  };
+  /** Supersaw detection (trance/progressive). */
+  supersawAnalysis?: {
+    isSupersaw: boolean;
+    confidence: number;
+    voiceCount: number;
+  };
+  /** Vocal detection. */
+  vocalAnalysis?: {
+    hasVocals: boolean;
+    confidence: number;
+    vocalEnergyRatio: number;
+  };
 }
 
 export interface ArrangementSection {
