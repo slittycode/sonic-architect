@@ -13,6 +13,7 @@ interface SpectralAreaChartProps {
   timeline: SpectralTimeline;
   arrangement: ArrangementSection[];
   duration: number;
+  mode?: 'proportional' | 'absolute';
 }
 
 // Band colours (bottom to top: Sub Bass → Brilliance)
@@ -38,6 +39,7 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
   timeline,
   arrangement,
   duration,
+  mode = 'proportional',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -67,9 +69,6 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
     const data: Record<string, number>[] = [];
     for (let p = 0; p < numPoints; p++) {
       const row: Record<string, number> = { time: timeline.timePoints[p] };
-      // Convert dB to linear power, then normalise to percentage so each
-      // time slice sums to 100%.  This makes the stacking physically
-      // meaningful and removes dependence on input loudness.
       let totalPower = 0;
       const powers: number[] = [];
       for (const band of timeline.bands) {
@@ -78,7 +77,12 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
         totalPower += power;
       }
       for (let b = 0; b < timeline.bands.length; b++) {
-        row[timeline.bands[b].name] = totalPower > 0 ? (powers[b] / totalPower) * 100 : 0;
+        // Proportional: normalise each slice to 100% (shows tonal balance shape)
+        // Absolute: raw linear power (stack height rises/falls with total energy)
+        row[timeline.bands[b].name] =
+          mode === 'proportional' && totalPower > 0
+            ? (powers[b] / totalPower) * 100
+            : powers[b];
       }
       data.push(row);
     }
@@ -152,7 +156,11 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
         d3
           .axisLeft(y)
           .ticks(4)
-          .tickFormat((d) => `${Math.round(d as number)}%`)
+          .tickFormat((d) =>
+            mode === 'proportional'
+              ? `${Math.round(d as number)}%`
+              : (d as number).toExponential(1)
+          )
       )
       .selectAll('text')
       .style('font-size', '9px')
@@ -209,7 +217,7 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
         .style('fill', '#71717a')
         .style('font-family', 'ui-monospace, monospace');
     });
-  }, [timeline, arrangement, duration]);
+  }, [timeline, arrangement, duration, mode]);
 
   return (
     <div

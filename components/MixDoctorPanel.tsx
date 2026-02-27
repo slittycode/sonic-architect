@@ -252,10 +252,19 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
             {/* Dynamics block */}
             <DiagnosticCard
               accentColor="bg-blue-500"
-              label="Dynamics (Crest Factor)"
-              value={`${report.dynamicsAdvice.actualCrest} dB`}
+              label="Dynamics & Headroom"
+              value={
+                report.dynamicsAdvice.actualPlr != null
+                  ? `PLR ${report.dynamicsAdvice.actualPlr} dB`
+                  : `CF ${report.dynamicsAdvice.actualCrest} dB`
+              }
             >
               {report.dynamicsAdvice.message}
+              {report.dynamicsAdvice.actualPlr != null && (
+                <span className="block mt-1 text-[10px] text-zinc-600">
+                  Crest factor: {report.dynamicsAdvice.actualCrest} dB · PLR: {report.dynamicsAdvice.actualPlr} dB
+                </span>
+              )}
             </DiagnosticCard>
 
             {/* LUFS block */}

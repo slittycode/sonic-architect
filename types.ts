@@ -109,6 +109,8 @@ export interface AudioFeatures {
   rmsProfile: number[]; // energy over time (for arrangement)
   spectralBands: SpectralBandEnergy[];
   crestFactor: number; // peak-to-RMS ratio (compression indicator)
+  /** Peak-to-Loudness Ratio in dB (TruePeak − LUFS_integrated). Higher = more dynamic. Set when both loudness values are available. */
+  plr?: number;
   onsetCount: number;
   onsetDensity: number; // onsets per second
   duration: number;
@@ -205,6 +207,8 @@ export interface GenreProfile {
   name: string;
   /** Expected dynamics range (crest factor) in dB */
   targetCrestFactorRange: [number, number];
+  /** Expected PLR range in dB (TruePeak − LUFS_integrated). Replaces crest factor for compression assessment. */
+  targetPlrRange?: [number, number];
   /** Target average dB profiles for spectral bands */
   spectralTargets: Record<string, { minDb: number; maxDb: number; optimalDb: number }>;
   /** Target integrated loudness range in LUFS (e.g. [-16, -12] for EDM) */
@@ -226,6 +230,7 @@ export interface MixDoctorReport {
     issue: 'too-compressed' | 'too-dynamic' | 'optimal';
     message: string;
     actualCrest: number;
+    actualPlr?: number;
   };
   loudnessAdvice?: {
     issue: 'too-loud' | 'too-quiet' | 'optimal';

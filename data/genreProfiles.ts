@@ -24,6 +24,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'edm',
     name: 'Electronic / EDM',
     targetCrestFactorRange: [5, 9], // heavily compressed
+    targetPlrRange: [6, 10],
     targetLufsRange: [-16, -10],
     spectralTargets: {
       'Sub Bass': { minDb: -15, maxDb: -8, optimalDb: -11 },
@@ -39,6 +40,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'hiphop',
     name: 'Hip Hop / Trap',
     targetCrestFactorRange: [7, 11], // punchy drums, thick subs
+    targetPlrRange: [7, 11],
     targetLufsRange: [-14, -8],
     spectralTargets: {
       'Sub Bass': { minDb: -16, maxDb: -6, optimalDb: -10 }, // loudest sub bass
@@ -54,6 +56,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'rock',
     name: 'Rock / Metal',
     targetCrestFactorRange: [9, 14], // more dynamic range, transient drums
+    targetPlrRange: [9, 14],
     targetLufsRange: [-16, -10],
     spectralTargets: {
       'Sub Bass': { minDb: -25, maxDb: -15, optimalDb: -20 }, // less sub weight
@@ -69,6 +72,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'pop',
     name: 'Modern Pop',
     targetCrestFactorRange: [6, 10], // controlled, loud, vocal upfront
+    targetPlrRange: [7, 11],
     targetLufsRange: [-16, -10],
     spectralTargets: {
       'Sub Bass': { minDb: -18, maxDb: -10, optimalDb: -14 },
@@ -84,6 +88,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'acoustic',
     name: 'Acoustic / Indie',
     targetCrestFactorRange: [12, 18], // highly dynamic, uncompressed
+    targetPlrRange: [13, 20],
     targetLufsRange: [-20, -14],
     spectralTargets: {
       'Sub Bass': { minDb: -35, maxDb: -25, optimalDb: -30 }, // negligible sub
@@ -100,6 +105,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'techno',
     name: 'Techno',
     targetCrestFactorRange: [4, 8], // heavily compressed, relentless kick
+    targetPlrRange: [5, 9],
     targetLufsRange: [-14, -8],
     spectralTargets: {
       'Sub Bass': { minDb: -14, maxDb: -6, optimalDb: -10 },
@@ -115,6 +121,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'house',
     name: 'House',
     targetCrestFactorRange: [5, 10], // punchy but warmer than techno
+    targetPlrRange: [6, 10],
     targetLufsRange: [-16, -10],
     spectralTargets: {
       'Sub Bass': { minDb: -16, maxDb: -8, optimalDb: -12 },
@@ -130,6 +137,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'ambient',
     name: 'Ambient / Downtempo',
     targetCrestFactorRange: [10, 18], // wide dynamics, breathing space
+    targetPlrRange: [12, 20],
     targetLufsRange: [-24, -16],
     spectralTargets: {
       'Sub Bass': { minDb: -28, maxDb: -18, optimalDb: -23 }, // gentle sub pad
@@ -145,6 +153,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'dnb',
     name: 'Drum & Bass / Jungle',
     targetCrestFactorRange: [6, 12], // fast transient drums, heavy bass
+    targetPlrRange: [7, 11],
     targetLufsRange: [-14, -8],
     spectralTargets: {
       'Sub Bass': { minDb: -14, maxDb: -6, optimalDb: -10 }, // reese / sub weight
@@ -160,6 +169,7 @@ export const GENRE_PROFILES: GenreProfile[] = [
     id: 'garage',
     name: 'Garage / UK Bass',
     targetCrestFactorRange: [6, 11], // shuffled, sub-heavy
+    targetPlrRange: [6, 10],
     targetLufsRange: [-16, -10],
     spectralTargets: {
       'Sub Bass': { minDb: -14, maxDb: -6, optimalDb: -10 }, // deep sub

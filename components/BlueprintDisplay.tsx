@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles, Drum, Fingerprint, Music } from 'lucide-react';
 import { ReconstructionBlueprint } from '../types';
 import MixDoctorPanel from './MixDoctorPanel';
@@ -38,30 +38,68 @@ function renderInline(text: string): React.ReactNode {
   );
 }
 function renderMarkdown(text: string): React.ReactNode {
-  const paragraphs = text.split(/\n{2,}/);
-  return paragraphs.map((para, pi) => {
-    const lines = para.split('\n');
-    if (lines.every((l) => /^\d+\.\s/.test(l.trim()))) {
+  // Pass 1: split into paragraph blocks
+  const blocks = text.split(/\n{2,}/);
+
+  // Pass 2: group consecutive numbered/bulleted blocks into lists
+  type Group =
+    | { type: 'ol'; items: string[] }
+    | { type: 'ul'; items: string[] }
+    | { type: 'p'; content: string };
+
+  const groups: Group[] = [];
+  for (const block of blocks) {
+    const firstLine = block.split('\n')[0].trim();
+    const isNumbered = /^\d+[.)]\s/.test(firstLine);
+    const isBullet = /^[-*]\s/.test(firstLine);
+
+    if (isNumbered) {
+      const last = groups[groups.length - 1];
+      const content = block.replace(/^\d+[.)]\s*/, '').replace(/\n/g, ' ');
+      if (last?.type === 'ol') {
+        last.items.push(content);
+      } else {
+        groups.push({ type: 'ol', items: [content] });
+      }
+    } else if (isBullet) {
+      const last = groups[groups.length - 1];
+      const content = block.replace(/^[-*]\s*/, '').replace(/\n/g, ' ');
+      if (last?.type === 'ul') {
+        last.items.push(content);
+      } else {
+        groups.push({ type: 'ul', items: [content] });
+      }
+    } else {
+      groups.push({ type: 'p', content: block.replace(/\n/g, ' ') });
+    }
+  }
+
+  return groups.map((g, gi) => {
+    if (g.type === 'ol') {
       return (
-        <ol key={pi} className="list-decimal list-inside space-y-1 text-sm text-indigo-200/80">
-          {lines.map((l, li) => (
-            <li key={li}>{renderInline(l.replace(/^\d+\.\s/, ''))}</li>
+        <ol key={gi} className="list-decimal list-inside space-y-2 text-sm text-indigo-200/80">
+          {g.items.map((item, ii) => (
+            <li key={ii} className="leading-relaxed">
+              {renderInline(item)}
+            </li>
           ))}
         </ol>
       );
     }
-    if (lines.every((l) => /^[-*]\s/.test(l.trim()))) {
+    if (g.type === 'ul') {
       return (
-        <ul key={pi} className="list-disc list-inside space-y-1 text-sm text-indigo-200/80">
-          {lines.map((l, li) => (
-            <li key={li}>{renderInline(l.replace(/^[-*]\s/, ''))}</li>
+        <ul key={gi} className="list-disc list-inside space-y-2 text-sm text-indigo-200/80">
+          {g.items.map((item, ii) => (
+            <li key={ii} className="leading-relaxed">
+              {renderInline(item)}
+            </li>
           ))}
         </ul>
       );
     }
     return (
-      <p key={pi} className="text-sm text-indigo-200/80 leading-relaxed">
-        {renderInline(para)}
+      <p key={gi} className="text-sm text-indigo-200/80 leading-relaxed">
+        {renderInline(g.content)}
       </p>
     );
   });
@@ -75,6 +113,19 @@ const TelemetryItem: React.FC<{ label: string; value: string }> = ({ label, valu
 );
 
 const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
+  const [spectralMode, setSpectralMode] = useState<'proportional' | 'absolute'>(() => {
+    try {
+      return (localStorage.getItem('sonic-spectral-mode') as 'proportional' | 'absolute') ?? 'proportional';
+    } catch {
+      return 'proportional';
+    }
+  });
+
+  const toggleSpectralMode = (next: 'proportional' | 'absolute') => {
+    setSpectralMode(next);
+    try { localStorage.setItem('sonic-spectral-mode', next); } catch {}
+  };
+
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -171,70 +222,6 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               ))}
             </div>
           </div>
-          {/* Chord Progression */}
-          {blueprint.chordProgression && blueprint.chordProgression.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
-              <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
-                <Music className="w-4 h-4 text-amber-400" aria-hidden="true" />
-                <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
-                  Chord Progression
-                </h3>
-              </div>
-              {blueprint.chordProgressionSummary && (
-                <div className="px-5 pt-4 pb-2">
-                  <p className="text-xs text-amber-400/80 font-mono">{blueprint.chordProgressionSummary}</p>
-                </div>
-              )}
-              <div className="p-4 pt-2">
-                {(() => {
-                  const chords = blueprint.chordProgression;
-                  const totalStart = parseSegTime(chords[0].timeRange, 'start');
-                  const totalEnd = parseSegTime(chords[chords.length - 1].timeRange, 'end');
-                  const totalDuration = Math.max(1, totalEnd - totalStart);
-                  return (
-                    <div className="overflow-x-auto">
-                      <div
-                        className="flex gap-px"
-                        style={{ minWidth: `${Math.max(600, chords.length * 60)}px` }}
-                      >
-                        {chords.map((seg, idx) => {
-                          const s = parseSegTime(seg.timeRange, 'start');
-                          const e = parseSegTime(seg.timeRange, 'end');
-                          const pct = Math.max(4, ((e - s) / totalDuration) * 100);
-                          const hue = (rootNoteIndex(seg.root) * 30) % 360;
-                          return (
-                            <div
-                              key={idx}
-                              style={{ flex: `${pct} 0 0%` }}
-                              className="flex flex-col items-center py-2 px-1 bg-zinc-950 border border-zinc-800/50 rounded-sm hover:bg-zinc-800 transition-colors cursor-default"
-                              title={`${seg.chord} · ${seg.timeRange} · ${Math.round(seg.confidence * 100)}% conf`}
-                            >
-                              <span
-                                className="text-xs font-bold mono"
-                                style={{ color: `hsl(${hue},60%,65%)` }}
-                              >
-                                {seg.chord}
-                              </span>
-                              <span className="text-[8px] text-zinc-600 mt-0.5 mono">
-                                {seg.timeRange.split('–')[0]}
-                              </span>
-                              <div
-                                className="w-full mt-1 h-px rounded-full"
-                                style={{
-                                  background: `hsl(${hue},50%,40%)`,
-                                  opacity: seg.confidence,
-                                }}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Middle Column: The Rack (Instruments) & Patches */}
@@ -452,12 +439,28 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                 Spectral Balance Over Time
               </h3>
+              <div className="ml-auto flex gap-1">
+                {(['proportional', 'absolute'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => toggleSpectralMode(m)}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors ${
+                      spectralMode === m
+                        ? 'bg-violet-600/20 border-violet-500 text-violet-400'
+                        : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {m === 'proportional' ? '%' : 'abs'}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="p-4">
               <SpectralAreaChart
                 timeline={blueprint.spectralTimeline}
                 arrangement={blueprint.arrangement}
                 duration={blueprint.meta?.duration ?? 0}
+                mode={spectralMode}
               />
             </div>
           </div>
@@ -475,6 +478,68 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
                 duration={blueprint.meta?.duration ?? 0}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chord Progression — Full Width */}
+      {blueprint.chordProgression && blueprint.chordProgression.length > 0 && (
+        <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+            <Music className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+              Chord Progression
+            </h3>
+            {blueprint.chordProgressionSummary && (
+              <span className="ml-auto text-xs text-amber-400/70 font-mono">
+                {blueprint.chordProgressionSummary}
+              </span>
+            )}
+          </div>
+          <div className="p-4">
+            {(() => {
+              const chords = blueprint.chordProgression;
+              const totalStart = parseSegTime(chords[0].timeRange, 'start');
+              const totalEnd = parseSegTime(chords[chords.length - 1].timeRange, 'end');
+              const totalDuration = Math.max(1, totalEnd - totalStart);
+              return (
+                <div className="overflow-x-auto">
+                  <div
+                    className="flex gap-px"
+                    style={{ minWidth: `${Math.max(800, chords.length * 60)}px` }}
+                  >
+                    {chords.map((seg, idx) => {
+                      const s = parseSegTime(seg.timeRange, 'start');
+                      const e = parseSegTime(seg.timeRange, 'end');
+                      const pct = Math.max(4, ((e - s) / totalDuration) * 100);
+                      const hue = (rootNoteIndex(seg.root) * 30) % 360;
+                      return (
+                        <div
+                          key={idx}
+                          style={{ flex: `${pct} 0 0%` }}
+                          className="flex flex-col items-center py-2 px-1 bg-zinc-950 border border-zinc-800/50 rounded-sm hover:bg-zinc-800 transition-colors cursor-default"
+                          title={`${seg.chord} · ${seg.timeRange} · ${Math.round(seg.confidence * 100)}% conf`}
+                        >
+                          <span
+                            className="text-xs font-bold mono"
+                            style={{ color: `hsl(${hue},60%,65%)` }}
+                          >
+                            {seg.chord}
+                          </span>
+                          <span className="text-[8px] text-zinc-600 mt-0.5 mono">
+                            {seg.timeRange.split('–')[0]}
+                          </span>
+                          <div
+                            className="w-full mt-1 h-px rounded-full"
+                            style={{ background: `hsl(${hue},50%,40%)`, opacity: seg.confidence }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

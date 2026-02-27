@@ -318,6 +318,13 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
   // --- LUFS loudness measurement ---
   const loudness = measureLoudness(audioBuffer);
 
+  // --- PLR (Peak-to-Loudness Ratio) ---
+  // TruePeak(dBTP) − LUFS_integrated. Higher = more dynamic (less compressed).
+  const plr: number | undefined =
+    loudness.lufsIntegrated != null && loudness.truePeak != null
+      ? Math.round((loudness.truePeak - loudness.lufsIntegrated) * 10) / 10
+      : undefined;
+
   // --- Stereo field analysis ---
   const stereo = analyzeStereoField(audioBuffer);
 
@@ -333,6 +340,7 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
     rmsProfile,
     spectralBands,
     crestFactor: Math.round(crestFactor * 10) / 10,
+    plr,
     onsetCount,
     onsetDensity: Math.round(onsetDensity * 10) / 10,
     duration,

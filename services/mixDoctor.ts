@@ -107,25 +107,39 @@ export function generateMixReport(
     });
   }
 
-  // Evaluate dynamics (Crest Factor)
+  // Evaluate dynamics: PLR-primary with crest factor fallback
   let dynamicsIssue: 'too-compressed' | 'too-dynamic' | 'optimal' = 'optimal';
   let dynamicsMsg = 'Solid dynamic range. Fits the genre well.';
   let dynamicsPenalty = 0;
 
   const crest = features.crestFactor;
-  const [minCrest, maxCrest] = profile.targetCrestFactorRange;
+  const plr = features.plr;
 
-  if (crest < minCrest) {
-    dynamicsIssue = 'too-compressed';
-    dynamicsMsg =
-      'Too compressed/squashed. The mix lacks transient punch. Ease off the master limiter or bus compressors.';
-    // Proportional penalty: 2.5 pts per dB outside range, capped at 15
-    dynamicsPenalty = Math.min(15, (minCrest - crest) * 2.5);
-  } else if (crest > maxCrest) {
-    dynamicsIssue = 'too-dynamic';
-    dynamicsMsg =
-      'Too dynamic. Transients are jumping out too much. Add bus compression or saturation to glue the mix.';
-    dynamicsPenalty = Math.min(15, (crest - maxCrest) * 2.5);
+  if (plr != null && profile.targetPlrRange) {
+    const [minPlr, maxPlr] = profile.targetPlrRange;
+    if (plr < minPlr) {
+      dynamicsIssue = 'too-compressed';
+      dynamicsMsg = `PLR of ${plr} dB is below the ${minPlr}–${maxPlr} dB target for ${profile.name}. The mix is over-compressed — ease off the master limiter or reduce bus compression to recover transient punch.`;
+      dynamicsPenalty = Math.min(15, (minPlr - plr) * 2.5);
+    } else if (plr > maxPlr) {
+      dynamicsIssue = 'too-dynamic';
+      dynamicsMsg = `PLR of ${plr} dB exceeds the ${minPlr}–${maxPlr} dB target for ${profile.name}. Wide dynamic range — add bus compression or saturation to glue the mix.`;
+      dynamicsPenalty = Math.min(15, (plr - maxPlr) * 2.5);
+    }
+  } else {
+    // Fallback: crest factor when PLR is unavailable
+    const [minCrest, maxCrest] = profile.targetCrestFactorRange;
+    if (crest < minCrest) {
+      dynamicsIssue = 'too-compressed';
+      dynamicsMsg =
+        'Too compressed/squashed. The mix lacks transient punch. Ease off the master limiter or bus compressors.';
+      dynamicsPenalty = Math.min(15, (minCrest - crest) * 2.5);
+    } else if (crest > maxCrest) {
+      dynamicsIssue = 'too-dynamic';
+      dynamicsMsg =
+        'Too dynamic. Transients are jumping out too much. Add bus compression or saturation to glue the mix.';
+      dynamicsPenalty = Math.min(15, (crest - maxCrest) * 2.5);
+    }
   }
 
   // --- Evaluate LUFS loudness ---
@@ -203,6 +217,7 @@ export function generateMixReport(
       issue: dynamicsIssue,
       message: dynamicsMsg,
       actualCrest: Math.round(crest * 10) / 10,
+      actualPlr: plr != null ? Math.round(plr * 10) / 10 : undefined,
     },
     loudnessAdvice,
     stereoAdvice,
