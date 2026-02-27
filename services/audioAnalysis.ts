@@ -5,7 +5,7 @@
  * and Meyda. This is the core analysis engine that feeds into the local provider.
  */
 
-import { AudioFeatures, SpectralBandEnergy } from '../types';
+import { AudioFeatures, SpectralBandEnergy, SpectralTimeline, SpectralTimelineBand } from '../types';
 import { detectBPM } from './bpmDetection';
 import { detectKey } from './keyDetection';
 import { measureLoudness } from './loudness';
@@ -292,6 +292,29 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
     };
   });
 
+  // --- Spectral Timeline (per-band energy over time) ---
+  // Downsample to ~200 time points max for visualization performance.
+  const maxTimelinePoints = 200;
+  const timelineStep = Math.max(1, Math.ceil(numFrames / maxTimelinePoints));
+  const timelinePoints: number[] = [];
+  const timelineBands: SpectralTimelineBand[] = SPECTRAL_BANDS.map((band) => ({
+    name: band.name,
+    energyDb: [],
+  }));
+
+  for (let f = 0; f < numFrames; f += timelineStep) {
+    timelinePoints.push((f * hopSize) / sampleRate);
+    for (let b = 0; b < SPECTRAL_BANDS.length; b++) {
+      const val = bandEnergies[b][f];
+      timelineBands[b].energyDb.push(val > 0 ? 20 * Math.log10(val) : -100);
+    }
+  }
+
+  const spectralTimeline: SpectralTimeline = {
+    timePoints: timelinePoints,
+    bands: timelineBands,
+  };
+
   // --- LUFS loudness measurement ---
   const loudness = measureLoudness(audioBuffer);
 
@@ -321,5 +344,6 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
     stereoWidth: stereo.stereoWidth,
     monoCompatible: stereo.monoCompatible,
     mfcc: mfccResult.mean,
+    spectralTimeline,
   };
 }

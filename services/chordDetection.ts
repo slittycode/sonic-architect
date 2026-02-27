@@ -178,10 +178,15 @@ function formatTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+function parseTimeRange(s: string): number {
+  const parts = s.trim().split(':');
+  return parseInt(parts[0]) * 60 + parseInt(parts[1] ?? '0');
+}
+
 export function detectChords(
   audioBuffer: AudioBuffer,
   windowSeconds: number = 2,
-  hopSeconds: number = 1
+  hopSeconds: number = 2
 ): ChordProgressionResult {
   const sampleRate = audioBuffer.sampleRate;
   const channelData = audioBuffer.getChannelData(0);
@@ -261,8 +266,27 @@ export function detectChords(
     confidence: Math.round((confidenceSum / count) * 100) / 100,
   });
 
+  // Post-process: confidence and minimum duration filters
+  const MIN_CONFIDENCE = 0.45;
+  const MIN_DURATION_S = 2;
+  const filtered = merged.filter((seg) => {
+    const [startStr, endStr] = seg.timeRange.split('–');
+    const start = parseTimeRange(startStr);
+    const end = parseTimeRange(endStr);
+    return seg.confidence >= MIN_CONFIDENCE && end - start >= MIN_DURATION_S;
+  });
+  const postFiltered = filtered.length >= 2 ? filtered : merged;
+
+  // Cap at 32 segments by downsampling if needed
+  const final: ChordSegment[] =
+    postFiltered.length <= 32
+      ? postFiltered
+      : postFiltered.filter(
+          (_, i) => i % Math.ceil(postFiltered.length / 32) === 0
+        );
+
   const uniqueSequence: string[] = [];
-  for (const chord of merged) {
+  for (const chord of final) {
     if (uniqueSequence.length === 0 || uniqueSequence[uniqueSequence.length - 1] !== chord.chord) {
       uniqueSequence.push(chord.chord);
     }
@@ -270,10 +294,10 @@ export function detectChords(
 
   const progression = uniqueSequence.join(' – ');
   const averageConfidence =
-    merged.reduce((sum, chord) => sum + chord.confidence, 0) / merged.length;
+    final.reduce((sum, chord) => sum + chord.confidence, 0) / final.length;
 
   return {
-    chords: merged,
+    chords: final,
     progression,
     confidence: Math.round(averageConfidence * 100) / 100,
   };

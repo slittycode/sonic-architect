@@ -186,23 +186,23 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
     return quantizeNotes(result.notes, result.bpm, quantizeOptions);
   }, [result, quantizeOptions]);
 
-  // Redraw piano roll when notes change
+  // Redraw piano roll when notes change or panel re-expands
   useEffect(() => {
-    if (!canvasRef.current || !result) return;
+    if (!canvasRef.current || !result || !expanded) return;
     drawPianoRoll(canvasRef.current, displayNotes, result.duration);
-  }, [displayNotes, result]);
+  }, [displayNotes, result, expanded]);
 
   // Handle resize
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !result) return;
+    if (!canvas || !result || !expanded) return;
 
     const observer = new ResizeObserver(() => {
       drawPianoRoll(canvas, displayNotes, result.duration);
     });
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [displayNotes, result]);
+  }, [displayNotes, result, expanded]);
 
   // Stop preview on unmount
   useEffect(() => {

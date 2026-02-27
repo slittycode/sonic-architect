@@ -1,6 +1,14 @@
 import { AudioFeatures, MixDoctorReport, MixAdvice } from '../types';
 import { getProfile } from '../data/genreProfiles';
 
+/** Return the median of a numeric array (sorts in place). */
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  values.sort((a, b) => a - b);
+  const mid = Math.floor(values.length / 2);
+  return values.length % 2 !== 0 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+}
+
 /**
  * Compare an analyzed track's audio features against a genre profile
  * to produce mix/mastering feedback and an overall deviation score.
@@ -11,6 +19,17 @@ export function generateMixReport(
 ): MixDoctorReport {
   const profile = getProfile(genreId);
 
+  // Compute median offset between measured and target dB to normalise for
+  // input loudness.  This lets us evaluate spectral SHAPE (relative balance)
+  // rather than absolute level, which varies with mastering and file format.
+  const offsets: number[] = [];
+  for (const band of features.spectralBands) {
+    const target = profile.spectralTargets[band.name];
+    if (!target) continue;
+    offsets.push(band.averageDb - target.optimalDb);
+  }
+  const loudnessOffset = offsets.length >= 3 ? median(offsets) : 0;
+
   const advice: MixAdvice[] = [];
   let scoreAccumulator = 0;
   let bandsEvaluated = 0;
@@ -20,14 +39,25 @@ export function generateMixReport(
     const target = profile.spectralTargets[band.name];
     if (!target) continue;
 
-    const currentDb = band.averageDb;
+    const currentDb = band.averageDb - loudnessOffset;
     const diffToOptimal = currentDb - target.optimalDb;
     let issue: MixAdvice['issue'] = 'optimal';
     let message = `Balanced.`;
 
-    // Deviation scoring (0-100 scale per band)
-    // 0 error = 100 points. Max error (say 15dB) = 0 points.
-    let bandScore = 100 - Math.abs(diffToOptimal) * 6.66;
+    // Range-aware scoring: inside [minDb, maxDb] → 80-100 points,
+    // outside → drops from 80 at 5 pts/dB past boundary.
+    const inRange = currentDb >= target.minDb && currentDb <= target.maxDb;
+    let bandScore: number;
+    if (inRange) {
+      const rangeHalf = (target.maxDb - target.minDb) / 2;
+      const normalizedDiff = rangeHalf > 0 ? Math.abs(diffToOptimal) / rangeHalf : 0;
+      bandScore = 100 - normalizedDiff * 20;
+    } else {
+      const overshoot = currentDb > target.maxDb
+        ? currentDb - target.maxDb
+        : target.minDb - currentDb;
+      bandScore = 80 - overshoot * 5;
+    }
     bandScore = Math.max(0, Math.min(100, bandScore));
     scoreAccumulator += bandScore;
     bandsEvaluated++;

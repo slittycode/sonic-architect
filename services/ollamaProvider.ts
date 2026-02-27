@@ -29,17 +29,27 @@ function buildPrompt(blueprint: ReconstructionBlueprint): string {
   return [
     'You are an Ableton Live 12 production assistant.',
     'Enhance descriptive text only. Do not change measured values.',
+    `BPM: ${blueprint.telemetry.bpm} | Key: ${blueprint.telemetry.key}`,
+    '',
+    'For each instrument, include in "abletonDevice": device chain + key parameter settings.',
+    'For each instrument, include in "timbre": synthesis type + approximate MIDI note range (e.g. C2-C5).',
+    'For fxChain, include sidechain compression setup if audible.',
+    'For secretSauce, give step-by-step Ableton Live 12 native device implementation.',
     '',
     'Return strict JSON with this shape only:',
     '{',
     '  "groove": "optional string",',
-    '  "instrumentation": [{"element":"exact existing element","timbre":"optional","abletonDevice":"optional"}],',
-    '  "fxChain": [{"artifact":"exact existing artifact","recommendation":"optional"}],',
-    '  "secretSauce": {"trick":"optional","execution":"optional"}',
+    '  "instrumentation": [{"element":"exact existing element","timbre":"synth type + MIDI range","abletonDevice":"device chain + settings"}],',
+    '  "fxChain": [{"artifact":"exact existing artifact","recommendation":"FX chain + sidechain routing"}],',
+    '  "secretSauce": {"trick":"technique name","execution":"Ableton steps"}',
     '}',
     '',
     'Blueprint:',
-    JSON.stringify(blueprint),
+    JSON.stringify({
+      telemetry: blueprint.telemetry,
+      instrumentation: blueprint.instrumentation.map((i) => ({ element: i.element })),
+      fxChain: blueprint.fxChain.map((f) => ({ artifact: f.artifact })),
+    }),
   ].join('\n');
 }
 

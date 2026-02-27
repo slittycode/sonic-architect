@@ -90,7 +90,7 @@ export enum AnalysisStatus {
 }
 
 // Provider types
-export type ProviderType = 'local' | 'ollama' | 'gemini' | 'claude';
+export type ProviderType = 'local' | 'ollama' | 'gemini' | 'claude' | 'openai';
 
 export interface AnalysisProvider {
   name: string;

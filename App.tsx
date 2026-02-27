@@ -19,6 +19,8 @@ import {
   ReconstructionBlueprint,
   PitchDetectionResult,
 } from './types';
+import { GEMINI_MODEL_LABELS } from './services/geminiService';
+import type { GeminiModelId } from './services/geminiService';
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
 import SessionMusician from './components/SessionMusician';
@@ -44,7 +46,7 @@ function getStoredProvider(): ProviderType {
     import.meta.env.VITE_GEMINI_API_KEY.length > 0;
   try {
     const stored = localStorage.getItem('sonic-architect-provider');
-    if (stored === 'gemini' || stored === 'local' || stored === 'ollama')
+    if (stored === 'gemini' || stored === 'local' || stored === 'ollama' || stored === 'openai')
       return stored as ProviderType;
     // If 'claude' was stored from a previous session but no Anthropic key is configured,
     // prefer Gemini (if available) so the app doesn't immediately show an Anthropic error.
@@ -94,6 +96,14 @@ const App: React.FC = () => {
   const [midiError, setMidiError] = useState<string | null>(null);
   const [polyMode, setPolyMode] = useState(false);
   const [alsInfo, setAlsInfo] = useState<AbletonSetInfo | null>(null);
+  const [geminiModel, setGeminiModel] = useState<GeminiModelId>(() => {
+    try {
+      const stored = localStorage.getItem('sonic-architect-gemini-model');
+      if (stored === 'gemini-2.0-flash' || stored === 'gemini-2.5-flash' || stored === 'gemini-2.5-pro')
+        return stored;
+    } catch {}
+    return 'gemini-2.5-flash';
+  });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -142,7 +152,7 @@ const App: React.FC = () => {
     if (providerType === 'gemini') {
       // Lazy load Gemini provider only when selected
       const { GeminiProvider } = await import('./services/geminiService');
-      const gemini = new GeminiProvider();
+      const gemini = new GeminiProvider(geminiModel);
       if (await gemini.isAvailable()) return gemini;
       // Fallback to local if Gemini API key is missing
       setProviderNotice('Gemini API key not found. Using Local DSP Engine.');
@@ -155,6 +165,14 @@ const App: React.FC = () => {
       setProviderNotice(
         'Claude API not configured. Using Local DSP Engine. Set ANTHROPIC_API_KEY.'
       );
+      return localProvider;
+    }
+
+    if (providerType === 'openai') {
+      const { OpenAIAnalysisProvider } = await import('./services/openaiProvider');
+      const openai = new OpenAIAnalysisProvider();
+      if (await openai.isAvailable()) return openai;
+      setProviderNotice('OpenAI API key not configured. Using Local DSP Engine.');
       return localProvider;
     }
 
@@ -344,20 +362,23 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [audioUrl]);
 
+  const geminiLabel = GEMINI_MODEL_LABELS[geminiModel];
   const providerLabel =
     providerType === 'gemini'
-      ? 'Gemini 2.0 Flash'
-      : providerType === 'claude'
-        ? 'Claude'
-        : providerType === 'ollama'
-          ? 'Ollama + Local DSP'
-          : 'Local DSP Engine';
+      ? geminiLabel
+      : providerType === 'openai'
+        ? 'GPT-4o Audio'
+        : providerType === 'claude'
+          ? 'Claude'
+          : providerType === 'ollama'
+            ? 'Ollama + Local DSP'
+            : 'Local DSP Engine';
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center pb-20">
       {/* Header */}
       <header className="w-full border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600 rounded-lg shadow-lg shadow-blue-500/20">
               <AudioLines className="w-6 h-6 text-white" aria-hidden="true" />
@@ -406,12 +427,32 @@ const App: React.FC = () => {
                   >
                     <Cloud className="w-4 h-4 text-blue-400 flex-shrink-0" aria-hidden="true" />
                     <div>
-                      <p className="text-sm font-medium text-zinc-200">Gemini 2.0 Flash</p>
+                      <p className="text-sm font-medium text-zinc-200">{geminiLabel}</p>
                       <p className="text-[10px] text-zinc-500">
                         Hybrid local+cloud · GEMINI_API_KEY in .env.local
                       </p>
                     </div>
                   </button>
+                  {providerType === 'gemini' && (
+                    <div className="px-3 py-2 bg-zinc-950 border-y border-zinc-800 flex gap-2">
+                      {(['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            setGeminiModel(m);
+                            try { localStorage.setItem('sonic-architect-gemini-model', m); } catch {}
+                          }}
+                          className={`flex-1 text-[10px] font-bold py-1.5 rounded border transition-colors ${
+                            geminiModel === m
+                              ? 'bg-blue-600/20 border-blue-500 text-blue-400'
+                              : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300'
+                          }`}
+                        >
+                          {GEMINI_MODEL_LABELS[m].replace('Gemini ', '')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <button
                     onClick={() => handleProviderChange('ollama')}
                     className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'ollama' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
@@ -437,6 +478,44 @@ const App: React.FC = () => {
                       <div className="text-xs text-zinc-500">Anthropic · Hybrid local+cloud</div>
                     </div>
                   </button>
+                  <button
+                    onClick={() => handleProviderChange('openai')}
+                    className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'openai' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
+                  >
+                    <Cloud
+                      className="w-4 h-4 text-emerald-400 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-zinc-200">GPT-4o Audio</div>
+                      <div className="text-xs text-zinc-500">
+                        OpenAI · Hybrid local+cloud audio analysis
+                      </div>
+                    </div>
+                  </button>
+                  {providerType === 'openai' && (
+                    <div className="px-3 py-2 bg-zinc-950 border-y border-zinc-800">
+                      <input
+                        type="password"
+                        placeholder="sk-... (OpenAI API key, stored locally)"
+                        defaultValue={(() => {
+                          try {
+                            return localStorage.getItem('openai_api_key') ?? '';
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          try {
+                            if (val) localStorage.setItem('openai_api_key', val);
+                            else localStorage.removeItem('openai_api_key');
+                          } catch {}
+                        }}
+                        className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -476,7 +555,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-6xl w-full px-6 mt-8 space-y-8">
+      <main className="max-w-[1400px] w-full px-6 mt-8 space-y-8">
         {/* Playback & Visualization */}
         <section className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 shadow-2xl">
           <div className="flex items-center justify-between mb-4">
@@ -545,21 +624,25 @@ const App: React.FC = () => {
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-blue-200">
                     {providerType === 'gemini'
-                      ? 'Running Local DSP + Gemini 2.0 Flash Enrichment...'
-                      : providerType === 'claude'
-                        ? 'Running Local DSP + Claude Enrichment...'
-                        : providerType === 'ollama'
-                          ? 'Analyzing Audio + Preparing Ollama Enhancement...'
-                          : 'Analyzing Audio Spectrogram...'}
+                      ? `Running Local DSP + ${geminiLabel} Enrichment...`
+                      : providerType === 'openai'
+                        ? 'Running Local DSP + GPT-4o Audio Enrichment...'
+                        : providerType === 'claude'
+                          ? 'Running Local DSP + Claude Enrichment...'
+                          : providerType === 'ollama'
+                            ? 'Analyzing Audio + Preparing Ollama Enhancement...'
+                            : 'Analyzing Audio Spectrogram...'}
                   </span>
                   <span className="text-xs text-blue-400/80">
                     {providerType === 'gemini'
                       ? 'BPM/key from local DSP — Gemini enriching timbre, devices, and technique descriptions...'
-                      : providerType === 'claude'
-                        ? 'BPM/key from local DSP — Claude enriching descriptions with Ableton expertise...'
-                        : providerType === 'ollama'
-                          ? 'Running local DSP first, then enriching descriptions with Ollama...'
-                          : 'Extracting BPM, key, spectral features, chords, and onset data...'}
+                      : providerType === 'openai'
+                        ? 'BPM/key from local DSP — GPT-4o listening to audio and enriching descriptions...'
+                        : providerType === 'claude'
+                          ? 'BPM/key from local DSP — Claude enriching descriptions with Ableton expertise...'
+                          : providerType === 'ollama'
+                            ? 'Running local DSP first, then enriching descriptions with Ollama...'
+                            : 'Extracting BPM, key, spectral features, chords, and onset data...'}
                   </span>
                 </div>
               </div>
@@ -622,10 +705,12 @@ const App: React.FC = () => {
                     : blueprint.meta.provider === 'ollama'
                       ? 'Ollama + Local DSP'
                       : blueprint.meta.provider === 'gemini'
-                        ? 'Gemini 2.0 Flash + Local DSP'
-                        : blueprint.meta.provider === 'claude'
-                          ? 'Claude + Local DSP'
-                          : blueprint.meta.provider}
+                        ? `${geminiLabel} + Local DSP`
+                        : blueprint.meta.provider === 'openai'
+                          ? 'GPT-4o + Local DSP'
+                          : blueprint.meta.provider === 'claude'
+                            ? 'Claude + Local DSP'
+                            : blueprint.meta.provider}
                 </span>
                 <span className="text-zinc-700">|</span>
                 <span>Analyzed in {blueprint.meta.analysisTime}ms</span>
@@ -710,7 +795,7 @@ const App: React.FC = () => {
                 Upload an audio file to generate a complete Ableton Live 12 reconstruction
                 blueprint.
                 {providerType === 'gemini'
-                  ? ' Local DSP measures BPM, key, and spectrum precisely — Gemini 2.0 Flash enriches descriptions and Ableton device recommendations.'
+                  ? ` Local DSP measures BPM, key, and spectrum precisely — ${geminiLabel} enriches descriptions and Ableton device recommendations.`
                   : providerType === 'claude'
                     ? ' Local DSP measures BPM, key, and spectrum precisely — Claude enriches descriptions with Ableton expertise.'
                     : providerType === 'ollama'
@@ -731,7 +816,7 @@ const App: React.FC = () => {
 
       {/* Footer Info */}
       <footer className="fixed bottom-0 w-full bg-zinc-950/80 backdrop-blur-sm border-t border-zinc-900 py-3">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-[10px] mono text-zinc-600 uppercase tracking-widest">
+        <div className="max-w-[1400px] mx-auto px-6 flex items-center justify-between text-[10px] mono text-zinc-600 uppercase tracking-widest">
           <span>Engine Status: Nominal</span>
           <span className="hidden sm:inline">Active Engine: {providerLabel}</span>
           <span>© 2025 Sonic Architect</span>

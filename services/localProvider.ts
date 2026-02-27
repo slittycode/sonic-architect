@@ -274,6 +274,7 @@ export function buildLocalBlueprint(
       duration: features.duration,
       channels: features.channels,
     },
+    spectralTimeline: features.spectralTimeline,
   };
 }
 

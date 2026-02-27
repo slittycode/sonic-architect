@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 interface WaveformVisualizerProps {
   audioUrl: string | null;
@@ -6,6 +6,7 @@ interface WaveformVisualizerProps {
   duration: number;
   playbackProgress: number;
   onSeek?: (time: number) => void;
+  onFileDrop?: (file: File) => void;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -13,9 +14,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 const WaveformVisualizer: React.FC<WaveformVisualizerProps> = React.memo(
-  ({ audioUrl, peaks, duration, playbackProgress, onSeek }) => {
+  ({ audioUrl, peaks, duration, playbackProgress, onSeek, onFileDrop }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [dragOver, setDragOver] = useState(false);
 
     const draw = useCallback(() => {
       const container = containerRef.current;
@@ -109,7 +111,31 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = React.memo(
     return (
       <div
         ref={containerRef}
-        className="w-full h-32 bg-zinc-900/50 rounded-lg border border-zinc-800 relative overflow-hidden"
+        className={`w-full h-32 bg-zinc-900/50 rounded-lg border relative overflow-hidden transition-colors ${
+          dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-zinc-800'
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (onFileDrop) setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+          setDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file && onFileDrop) onFileDrop(file);
+        }}
       >
         <canvas
           ref={canvasRef}

@@ -1,10 +1,70 @@
 import React from 'react';
-import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles, Drum, Fingerprint } from 'lucide-react';
+import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles, Drum, Fingerprint, Music } from 'lucide-react';
 import { ReconstructionBlueprint } from '../types';
 import MixDoctorPanel from './MixDoctorPanel';
+import SpectralAreaChart from './SpectralAreaChart';
+import SpectralHeatmap from './SpectralHeatmap';
 
 interface BlueprintDisplayProps {
   blueprint: ReconstructionBlueprint;
+}
+
+// --- Chord timeline helpers ---
+const NOTE_ORDER: Record<string, number> = {
+  C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5,
+  'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11,
+};
+function rootNoteIndex(root: string): number {
+  return NOTE_ORDER[root] ?? 0;
+}
+function parseSegTime(timeRange: string, side: 'start' | 'end'): number {
+  const parts = timeRange.split('–');
+  const s = (side === 'start' ? parts[0] : parts[1] ?? parts[0]).trim();
+  const [m, sec] = s.split(':');
+  return parseInt(m) * 60 + parseInt(sec ?? '0');
+}
+
+// --- Markdown renderer ---
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    /^\*\*[^*]+\*\*$/.test(part) ? (
+      <strong key={i} className="text-white font-semibold">
+        {part.slice(2, -2)}
+      </strong>
+    ) : (
+      part
+    )
+  );
+}
+function renderMarkdown(text: string): React.ReactNode {
+  const paragraphs = text.split(/\n{2,}/);
+  return paragraphs.map((para, pi) => {
+    const lines = para.split('\n');
+    if (lines.every((l) => /^\d+\.\s/.test(l.trim()))) {
+      return (
+        <ol key={pi} className="list-decimal list-inside space-y-1 text-sm text-indigo-200/80">
+          {lines.map((l, li) => (
+            <li key={li}>{renderInline(l.replace(/^\d+\.\s/, ''))}</li>
+          ))}
+        </ol>
+      );
+    }
+    if (lines.every((l) => /^[-*]\s/.test(l.trim()))) {
+      return (
+        <ul key={pi} className="list-disc list-inside space-y-1 text-sm text-indigo-200/80">
+          {lines.map((l, li) => (
+            <li key={li}>{renderInline(l.replace(/^[-*]\s/, ''))}</li>
+          ))}
+        </ul>
+      );
+    }
+    return (
+      <p key={pi} className="text-sm text-indigo-200/80 leading-relaxed">
+        {renderInline(para)}
+      </p>
+    );
+  });
 }
 
 const TelemetryItem: React.FC<{ label: string; value: string }> = ({ label, value }) => (
@@ -111,6 +171,70 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               ))}
             </div>
           </div>
+          {/* Chord Progression */}
+          {blueprint.chordProgression && blueprint.chordProgression.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+              <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+                <Music className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                  Chord Progression
+                </h3>
+              </div>
+              {blueprint.chordProgressionSummary && (
+                <div className="px-5 pt-4 pb-2">
+                  <p className="text-xs text-amber-400/80 font-mono">{blueprint.chordProgressionSummary}</p>
+                </div>
+              )}
+              <div className="p-4 pt-2">
+                {(() => {
+                  const chords = blueprint.chordProgression;
+                  const totalStart = parseSegTime(chords[0].timeRange, 'start');
+                  const totalEnd = parseSegTime(chords[chords.length - 1].timeRange, 'end');
+                  const totalDuration = Math.max(1, totalEnd - totalStart);
+                  return (
+                    <div className="overflow-x-auto">
+                      <div
+                        className="flex gap-px"
+                        style={{ minWidth: `${Math.max(600, chords.length * 60)}px` }}
+                      >
+                        {chords.map((seg, idx) => {
+                          const s = parseSegTime(seg.timeRange, 'start');
+                          const e = parseSegTime(seg.timeRange, 'end');
+                          const pct = Math.max(4, ((e - s) / totalDuration) * 100);
+                          const hue = (rootNoteIndex(seg.root) * 30) % 360;
+                          return (
+                            <div
+                              key={idx}
+                              style={{ flex: `${pct} 0 0%` }}
+                              className="flex flex-col items-center py-2 px-1 bg-zinc-950 border border-zinc-800/50 rounded-sm hover:bg-zinc-800 transition-colors cursor-default"
+                              title={`${seg.chord} · ${seg.timeRange} · ${Math.round(seg.confidence * 100)}% conf`}
+                            >
+                              <span
+                                className="text-xs font-bold mono"
+                                style={{ color: `hsl(${hue},60%,65%)` }}
+                              >
+                                {seg.chord}
+                              </span>
+                              <span className="text-[8px] text-zinc-600 mt-0.5 mono">
+                                {seg.timeRange.split('–')[0]}
+                              </span>
+                              <div
+                                className="w-full mt-1 h-px rounded-full"
+                                style={{
+                                  background: `hsl(${hue},50%,40%)`,
+                                  opacity: seg.confidence,
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Middle Column: The Rack (Instruments) & Patches */}
@@ -302,9 +426,11 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               </h3>
             </div>
             <div className="p-6">
-              <h4 className="text-base font-bold text-white mb-2">{blueprint.secretSauce.trick}</h4>
+              <h4 className="text-base font-bold text-white mb-2">
+                {renderMarkdown(blueprint.secretSauce.trick)}
+              </h4>
               <div className="text-sm text-indigo-200/80 leading-relaxed space-y-4">
-                <p>{blueprint.secretSauce.execution}</p>
+                {renderMarkdown(blueprint.secretSauce.execution)}
               </div>
               <div className="mt-6 pt-4 border-t border-indigo-500/20 flex justify-end">
                 <div className="text-[10px] mono text-indigo-400 flex items-center gap-2">
@@ -316,6 +442,42 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
           </div>
         </div>
       </div>
+
+      {/* Spectral Timeline Visualization */}
+      {blueprint.spectralTimeline && blueprint.spectralTimeline.timePoints.length > 0 && (
+        <div className="space-y-6 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+            <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-violet-400" aria-hidden="true" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                Spectral Balance Over Time
+              </h3>
+            </div>
+            <div className="p-4">
+              <SpectralAreaChart
+                timeline={blueprint.spectralTimeline}
+                arrangement={blueprint.arrangement}
+                duration={blueprint.meta?.duration ?? 0}
+              />
+            </div>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+            <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+              <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                Spectral Energy Heatmap
+              </h3>
+            </div>
+            <div className="p-4">
+              <SpectralHeatmap
+                timeline={blueprint.spectralTimeline}
+                arrangement={blueprint.arrangement}
+                duration={blueprint.meta?.duration ?? 0}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mix Doctor Dashboard */}
       {blueprint.mixReport && <MixDoctorPanel report={blueprint.mixReport} />}

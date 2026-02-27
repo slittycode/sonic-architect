@@ -1,10 +1,17 @@
 import { GoogleGenAI } from '@google/genai';
 import { AnalysisProvider, ReconstructionBlueprint } from '../types';
-import { decodeAudioFile } from './audioAnalysis';
+import { decodeAudioFile, extractAudioFeatures } from './audioAnalysis';
+import { generateMixReport } from './mixDoctor';
 
-const GEMINI_MODEL = 'models/gemini-2.5-flash';
-/** Separate model instance used for independent cross-verification. */
-const GEMINI_VERIFY_MODEL = 'models/gemini-2.5-flash';
+export type GeminiModelId = 'gemini-2.0-flash' | 'gemini-2.5-flash' | 'gemini-2.5-pro';
+
+export const GEMINI_MODEL_LABELS: Record<GeminiModelId, string> = {
+  'gemini-2.0-flash': 'Gemini 2.0 Flash',
+  'gemini-2.5-flash': 'Gemini 2.5 Flash',
+  'gemini-2.5-pro': 'Gemini 2.5 Pro',
+};
+
+const DEFAULT_MODEL: GeminiModelId = 'gemini-2.5-flash';
 /** Gemini inline audio upload hard cap (20 MB). Files above this skip cloud enrichment. */
 const GEMINI_INLINE_LIMIT = 20 * 1024 * 1024;
 
@@ -45,12 +52,30 @@ function buildEnhancementPrompt(blueprint: ReconstructionBlueprint): string {
     'Listen to the audio and ENHANCE only the descriptive text fields.',
     'Do NOT modify BPM, key, time ranges, or element/artifact names.',
     '',
+    'For each instrumentation element, include in "abletonDevice":',
+    '  1. Full Ableton 12 device chain (e.g. "Operator > Saturator > Reverb")',
+    '  2. Key parameter settings (FM ratios, ADSR values, drive/mix amounts)',
+    '  3. Sidechain routing if this element triggers ducking',
+    '',
+    'For each instrumentation element, include in "timbre":',
+    '  1. Synthesis method (subtractive, FM, wavetable, sampler, granular)',
+    '  2. Approximate MIDI note range (e.g. "C2–C5")',
+    '  3. Key patch descriptors for recreation in Vital or Ableton Operator',
+    '',
+    'For fxChain, describe the full signal chain including:',
+    '  1. Specific device settings (threshold, ratio, attack, release)',
+    '  2. Sidechain compression setup if applicable (source track, amount)',
+    '  3. Return channel vs insert distinction',
+    '',
+    'For secretSauce, provide step-by-step Ableton Live 12 implementation',
+    'using only native devices.',
+    '',
     'Return strict JSON with this shape only:',
     '{',
     '  "groove": "describe feel, micro-timing, and swing character",',
-    '  "instrumentation": [{"element":"exact existing element name","timbre":"sound texture description","abletonDevice":"Ableton 12 device + precise settings"}],',
-    '  "fxChain": [{"artifact":"exact existing artifact name","recommendation":"specific Ableton FX recommendation"}],',
-    '  "secretSauce": {"trick":"unique production technique heard","execution":"step-by-step Ableton Live 12 recreation"}',
+    '  "instrumentation": [{"element":"exact existing element name","timbre":"synthesis type + MIDI range + texture","abletonDevice":"device chain + parameter settings"}],',
+    '  "fxChain": [{"artifact":"exact existing artifact name","recommendation":"FX chain + device settings + sidechain routing"}],',
+    '  "secretSauce": {"trick":"unique production technique heard","execution":"step-by-step Ableton Live 12 recreation with native devices"}',
     '}',
     '',
     'Elements to enhance (use exact names):',
@@ -133,7 +158,7 @@ export function mergeGeminiEnhancement(
 /**
  * Gemini Provider — Hybrid mode.
  * Runs local DSP first (accurate BPM/key/spectrum/chords), then sends both
- * the audio AND the local measurements to Gemini 2.0 Flash so Gemini enriches
+ * the audio AND the local measurements to Gemini so it enriches
  * only the descriptive/creative text fields. This saves cost and gives better
  * measurement accuracy than asking Gemini to do everything from raw audio.
  *
@@ -147,6 +172,8 @@ interface GeminiVerificationResult {
   bpm?: { agreed: boolean; geminiEstimate?: string; note?: string };
   key?: { agreed: boolean; geminiEstimate?: string; note?: string };
   chords?: { agreed: boolean; geminiEstimate?: string; note?: string };
+  /** Genre classification for Mix Doctor scoring. */
+  genre?: { detected: string; note?: string };
   overallSummary?: string;
 }
 
@@ -164,18 +191,42 @@ function buildVerificationPrompt(blueprint: ReconstructionBlueprint): string {
   }
   lines.push(
     '',
+    'Also classify the genre/style of this track. Choose the single best match from:',
+    '  edm, hiphop, rock, pop, acoustic, techno, house, ambient, dnb, garage',
+    '',
+    'Also note in "overallSummary":',
+    '  - Whether the mix has audible sidechain compression (pumping/ducking)',
+    '  - Whether brickwall limiting artifacts are present',
+    '  - 1–2 specific Ableton 12 device chain tips based on the dominant mix characteristic',
+    '',
     'Return ONLY strict JSON:',
     '{',
     '  "bpm":    { "agreed": true, "geminiEstimate": "your BPM estimate", "note": "optional" },',
     '  "key":    { "agreed": true, "geminiEstimate": "your key estimate", "note": "optional" },',
     '  "chords": { "agreed": true, "geminiEstimate": "your chord reading", "note": "optional" },',
-    '  "overallSummary": "1-2 sentence accuracy verdict"',
+    '  "genre":  { "detected": "one of edm|hiphop|rock|pop|acoustic|techno|house|ambient|dnb|garage", "note": "optional" },',
+    '  "overallSummary": "1-2 sentence accuracy verdict + sidechain/limiting observations + Ableton tips"',
     '}'
   );
   return lines.join('\n');
 }
 
-function formatVerificationNotes(raw: string, blueprint: ReconstructionBlueprint): string {
+/** Structured corrections extracted from Gemini verification. */
+interface VerificationCorrections {
+  /** Gemini's key estimate — only set when Gemini disagreed with local DSP. */
+  key?: string;
+  /** Gemini's BPM estimate — only set when Gemini disagreed with local DSP. */
+  bpm?: string;
+  /** Genre ID for Mix Doctor scoring (always set when parse succeeds). */
+  genre?: string;
+  /** Human-readable verification notes string. */
+  notes: string;
+}
+
+function parseVerification(
+  raw: string,
+  blueprint: ReconstructionBlueprint
+): VerificationCorrections {
   let result: GeminiVerificationResult;
   try {
     const cleaned = raw
@@ -185,30 +236,44 @@ function formatVerificationNotes(raw: string, blueprint: ReconstructionBlueprint
       .trim();
     result = JSON.parse(cleaned) as GeminiVerificationResult;
   } catch {
-    return 'Verification parsing failed — local DSP measurements stand.';
+    return { notes: 'Verification parsing failed — local DSP measurements stand.' };
   }
 
-  const icon = (agreed: boolean | undefined) => (agreed ? '✓' : '⚠');
+  const icon = (agreed: boolean | undefined) => (agreed ? '\u2713' : '\u26a0');
   const parts: string[] = [];
+  const corrections: VerificationCorrections = { notes: '' };
 
+  // BPM
   if (result.bpm) {
-    parts.push(
-      result.bpm.agreed
-        ? `${icon(true)} BPM ${blueprint.telemetry.bpm} confirmed`
-        : `${icon(false)} BPM: local ${blueprint.telemetry.bpm}, Gemini hears ~${result.bpm.geminiEstimate ?? '?'}${
-            result.bpm.note ? ` (${result.bpm.note})` : ''
-          }`
-    );
+    if (result.bpm.agreed) {
+      parts.push(`${icon(true)} BPM ${blueprint.telemetry.bpm} confirmed`);
+    } else {
+      const est = result.bpm.geminiEstimate ?? '?';
+      parts.push(
+        `${icon(false)} BPM: local ${blueprint.telemetry.bpm}, Gemini hears ~${est}${
+          result.bpm.note ? ` (${result.bpm.note})` : ''
+        }`
+      );
+      corrections.bpm = est;
+    }
   }
+
+  // Key
   if (result.key) {
-    parts.push(
-      result.key.agreed
-        ? `${icon(true)} Key ${blueprint.telemetry.key} confirmed`
-        : `${icon(false)} Key: local ${blueprint.telemetry.key}, Gemini hears ${result.key.geminiEstimate ?? '?'}${
-            result.key.note ? ` (${result.key.note})` : ''
-          }`
-    );
+    if (result.key.agreed) {
+      parts.push(`${icon(true)} Key ${blueprint.telemetry.key} confirmed`);
+    } else {
+      const est = result.key.geminiEstimate ?? '?';
+      parts.push(
+        `${icon(false)} Key: local ${blueprint.telemetry.key}, Gemini hears ${est}${
+          result.key.note ? ` (${result.key.note})` : ''
+        }`
+      );
+      corrections.key = est;
+    }
   }
+
+  // Chords
   if (result.chords) {
     parts.push(
       result.chords.agreed
@@ -217,8 +282,19 @@ function formatVerificationNotes(raw: string, blueprint: ReconstructionBlueprint
     );
   }
 
+  // Genre
+  if (result.genre?.detected) {
+    const validGenres = ['edm', 'hiphop', 'rock', 'pop', 'acoustic', 'techno', 'house', 'ambient', 'dnb', 'garage'];
+    const normalised = result.genre.detected.toLowerCase().trim();
+    if (validGenres.includes(normalised)) {
+      corrections.genre = normalised;
+    }
+  }
+
   const summary = result.overallSummary ? ` — ${result.overallSummary}` : '';
-  return parts.length > 0 ? `${parts.join(' · ')}${summary}` : `Verification complete${summary}`;
+  corrections.notes =
+    parts.length > 0 ? `${parts.join(' · ')}${summary}` : `Verification complete${summary}`;
+  return corrections;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +340,7 @@ export class GeminiChatService {
 
     const ai = new GoogleGenAI({ apiKey });
     const responseStream = await ai.models.generateContentStream({
-      model: GEMINI_MODEL,
+      model: `models/${DEFAULT_MODEL}`,
       contents: historySnapshot,
       config: { systemInstruction },
     });
@@ -294,8 +370,16 @@ export class GeminiChatService {
 }
 
 export class GeminiProvider implements AnalysisProvider {
-  name = 'Gemini 2.0 Flash (Cloud + Local DSP)';
   type = 'gemini' as const;
+  private modelId: GeminiModelId;
+
+  constructor(model: GeminiModelId = DEFAULT_MODEL) {
+    this.modelId = model;
+  }
+
+  get name(): string {
+    return `${GEMINI_MODEL_LABELS[this.modelId]} (Cloud + Local DSP)`;
+  }
 
   async isAvailable(): Promise<boolean> {
     const key = import.meta.env.VITE_GEMINI_API_KEY;
@@ -352,14 +436,15 @@ export class GeminiProvider implements AnalysisProvider {
     const ai = new GoogleGenAI({ apiKey });
     const audioPart = { inlineData: { data: base64, mimeType: file.type } };
 
+    const modelPath = `models/${this.modelId}`;
     const [enrichmentResult, verificationResult] = await Promise.allSettled([
       ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: modelPath,
         contents: [{ parts: [audioPart, { text: buildEnhancementPrompt(localBlueprint) }] }],
         config: { responseMimeType: 'application/json' },
       }),
       ai.models.generateContent({
-        model: GEMINI_VERIFY_MODEL,
+        model: modelPath,
         contents: [{ parts: [audioPart, { text: buildVerificationPrompt(localBlueprint) }] }],
         config: { responseMimeType: 'application/json' },
       }),
@@ -373,18 +458,41 @@ export class GeminiProvider implements AnalysisProvider {
     const enhancement = parseGeminiEnhancement(enrichText);
     const merged = mergeGeminiEnhancement(localBlueprint, enhancement);
 
-    // Merge verification notes (BPM/key/chord agreement from Gemini listening)
-    const verifyNotes =
+    // Parse verification — extract structured corrections (key, BPM, genre)
+    const corrections: VerificationCorrections =
       verificationResult.status === 'fulfilled'
-        ? formatVerificationNotes(verificationResult.value.text ?? '', localBlueprint)
-        : 'Verification call failed — local DSP measurements stand.';
+        ? parseVerification(verificationResult.value.text ?? '', localBlueprint)
+        : { notes: 'Verification call failed — local DSP measurements stand.' };
+
+    // Apply key/BPM corrections when Gemini disagrees with local DSP
+    const telemetry = { ...merged.telemetry, verificationNotes: corrections.notes };
+
+    if (corrections.key) {
+      telemetry.localKeyEstimate = merged.telemetry.key;
+      telemetry.key = corrections.key;
+      telemetry.keyCorrectedByGemini = true;
+    }
+    if (corrections.bpm) {
+      telemetry.localBpmEstimate = merged.telemetry.bpm;
+      telemetry.bpm = corrections.bpm;
+      telemetry.bpmCorrectedByGemini = true;
+    }
+    if (corrections.genre) {
+      telemetry.detectedGenre = corrections.genre;
+    }
+
+    // Re-score Mix Doctor with the Gemini-detected genre (if available)
+    // This requires re-extracting features — we already have the audioBuffer.
+    let mixReport = merged.mixReport;
+    if (corrections.genre) {
+      const features = extractAudioFeatures(audioBuffer);
+      mixReport = generateMixReport(features, corrections.genre);
+    }
 
     return {
       ...merged,
-      telemetry: {
-        ...merged.telemetry,
-        verificationNotes: verifyNotes,
-      },
+      telemetry,
+      mixReport,
       meta: {
         provider: 'gemini',
         analysisTime,
