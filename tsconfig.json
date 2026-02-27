@@ -17,5 +17,6 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": ["skills", "node_modules", "dist", ".worktrees"]
 }

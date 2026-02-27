@@ -76,6 +76,8 @@ export interface ReconstructionBlueprint {
   mixReport?: MixDoctorReport;
   /** Mean MFCC coefficients (13 values) — timbre fingerprint. */
   mfcc?: number[];
+  /** Per-band energy over time for spectral timeline visualization. */
+  spectralTimeline?: SpectralTimeline;
   meta?: AnalysisMeta;
 }
 
