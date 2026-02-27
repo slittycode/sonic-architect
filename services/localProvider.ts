@@ -23,7 +23,12 @@ import { generateVitalPatch, generateOperatorPatch } from './patchSmith';
 import { generateMixReport } from './mixDoctor';
 import { detectChords, ChordProgressionResult } from './chordDetection';
 import { classifyGenre } from './genreClassifier';
+import {
+  classifyGenreEnhanced,
+  EnhancedGenreClassification,
+} from './genreClassifierEnhanced';
 import { separateHarmonicPercussive, wrapAsAudioBuffer } from './hpss';
+import { extractEssentiaFeatures } from './essentiaFeatures';
 
 /**
  * Segment the RMS energy profile into arrangement sections.
@@ -223,7 +228,8 @@ export function buildLocalBlueprint(
   features: AudioFeatures,
   analysisTime: number,
   provider: 'local' | 'ollama' = 'local',
-  chordResult?: ChordProgressionResult
+  chordResult?: ChordProgressionResult,
+  enhancedGenreResult?: EnhancedGenreClassification
 ): ReconstructionBlueprint {
   const arrangement = detectArrangement(features.rmsProfile, features.duration);
   const instrumentation = getInstrumentRecommendations(features.spectralBands);
@@ -233,8 +239,10 @@ export function buildLocalBlueprint(
     vital: generateVitalPatch(features),
     operator: generateOperatorPatch(features),
   };
-  const genreResult = classifyGenre(features);
-  const mixReport = generateMixReport(features, genreResult.genre);
+
+  // Use enhanced classification if available, otherwise fall back to basic
+  const primaryGenre = enhancedGenreResult?.genre || classifyGenre(features).genre;
+  const mixReport = generateMixReport(features, primaryGenre);
 
   return {
     telemetry: {
@@ -243,7 +251,24 @@ export function buildLocalBlueprint(
       groove: describeGroove(features),
       bpmConfidence: features.bpmConfidence,
       keyConfidence: features.key.confidence,
-      detectedGenre: genreResult.genre,
+      detectedGenre: primaryGenre,
+      // Enhanced classification fields (if available)
+      ...(enhancedGenreResult && {
+        enhancedGenre: enhancedGenreResult.genre,
+        secondaryGenre: enhancedGenreResult.secondaryGenre,
+        genreFamily: enhancedGenreResult.genreFamily,
+        sidechainAnalysis: enhancedGenreResult.sidechainAnalysis || undefined,
+        bassAnalysis: enhancedGenreResult.bassAnalysis
+          ? {
+              decayMs: enhancedGenreResult.bassAnalysis.averageDecayMs,
+              type: enhancedGenreResult.bassAnalysis.type,
+              transientRatio: enhancedGenreResult.bassAnalysis.transientRatio,
+            }
+          : undefined,
+        swingAnalysis: enhancedGenreResult.swingAnalysis || undefined,
+        acidAnalysis: enhancedGenreResult.acidAnalysis || undefined,
+        reverbAnalysis: enhancedGenreResult.reverbAnalysis || undefined,
+      }),
     },
     arrangement,
     instrumentation,
@@ -303,6 +328,16 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     const features = extractAudioFeatures(audioBuffer);
     signal?.throwIfAborted();
 
+    // Essentia.js WASM features (lazy-loaded, non-blocking on failure)
+    const essentiaFeatures = await extractEssentiaFeatures(audioBuffer).catch(() => null);
+    if (essentiaFeatures) {
+      features.dissonance = essentiaFeatures.dissonance;
+      features.hfc = essentiaFeatures.hfc;
+      features.spectralComplexity = essentiaFeatures.spectralComplexity;
+      features.zeroCrossingRate = essentiaFeatures.zeroCrossingRate;
+    }
+    signal?.throwIfAborted();
+
     // HPSS: separate harmonic content for more accurate chord detection.
     // Key detection already uses Goertzel (frequency-domain), so it's less
     // affected by drums, but chords benefit significantly from HPSS.
@@ -318,8 +353,23 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     const beatResult = trackBeats(audioBuffer, features.bpm);
     signal?.throwIfAborted();
 
+    // Enhanced genre classification with sidechain/bass decay analysis
+    // This runs in parallel with beat tracking for efficiency
+    const enhancedGenreResult = await classifyGenreEnhanced(
+      features,
+      audioBuffer,
+      beatResult.beats
+    );
+    signal?.throwIfAborted();
+
     const analysisTime = Math.round(performance.now() - startTime);
-    const blueprint = buildLocalBlueprint(features, analysisTime, 'local', chordResult);
+    const blueprint = buildLocalBlueprint(
+      features,
+      analysisTime,
+      'local',
+      chordResult,
+      enhancedGenreResult
+    );
 
     // Inject beat positions into telemetry (not part of AudioFeatures)
     blueprint.telemetry.beatPositions = beatResult.beats;

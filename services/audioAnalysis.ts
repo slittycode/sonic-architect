@@ -41,7 +41,7 @@ const HANN_WINDOW = createHannWindow(FRAME_SIZE);
 /**
  * In-place radix-2 FFT for real/imag arrays of equal power-of-two length.
  */
-function fftInPlace(real: Float32Array, imag: Float32Array): void {
+export function fftInPlace(real: Float32Array, imag: Float32Array): void {
   const n = real.length;
 
   // Bit-reversal permutation

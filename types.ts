@@ -8,6 +8,12 @@ export interface GlobalTelemetry {
   verificationNotes?: string;
   /** Genre detected by classification or LLM verification. */
   detectedGenre?: string;
+  /** Enhanced subgenre (if using expanded classification). */
+  enhancedGenre?: string;
+  /** Secondary genre candidate from enhanced classification. */
+  secondaryGenre?: string | null;
+  /** Genre family classification (house, techno, dnb, etc.). */
+  genreFamily?: 'house' | 'techno' | 'dnb' | 'ambient' | 'trance' | 'dubstep' | 'breaks' | 'other';
   /** True when Gemini overrode the local DSP key estimate. */
   keyCorrectedByGemini?: boolean;
   /** Original local DSP key estimate before Gemini correction. */
@@ -20,6 +26,34 @@ export interface GlobalTelemetry {
   beatPositions?: number[];
   /** Downbeat (bar start) position in seconds. For clip launch alignment. */
   downbeatPosition?: number;
+  /** Sidechain pump detection results. */
+  sidechainAnalysis?: {
+    hasSidechain: boolean;
+    strength: number;
+  };
+  /** Bass decay analysis results. */
+  bassAnalysis?: {
+    decayMs: number;
+    type: 'punchy' | 'medium' | 'rolling' | 'sustained';
+    transientRatio: number;
+  };
+  /** Swing/groove detection results. */
+  swingAnalysis?: {
+    swingPercent: number;
+    grooveType: 'straight' | 'slight-swing' | 'heavy-swing' | 'shuffle';
+  };
+  /** Acid/303 bassline detection results. */
+  acidAnalysis?: {
+    isAcid: boolean;
+    confidence: number;
+    resonanceLevel: number;
+  };
+  /** Reverb tail analysis. */
+  reverbAnalysis?: {
+    rt60: number;
+    isWet: boolean;
+    tailEnergyRatio: number;
+  };
 }
 
 export interface ArrangementSection {
@@ -130,6 +164,14 @@ export interface AudioFeatures {
   spectralTimeline?: SpectralTimeline;
   /** Mean MFCC coefficients (13 values) — timbre fingerprint. */
   mfcc?: number[];
+  /** Essentia.js: harmonic roughness/dissonance 0-1 (acid/industrial detection) */
+  dissonance?: number;
+  /** Essentia.js: high frequency content (hi-hat/cymbal energy proxy) */
+  hfc?: number;
+  /** Essentia.js: spectral complexity — number of spectral peaks */
+  spectralComplexity?: number;
+  /** Essentia.js: zero crossing rate (noise/percussion content) */
+  zeroCrossingRate?: number;
 }
 
 export interface SpectralBandEnergy {
@@ -173,6 +215,9 @@ export interface DetectedNote {
   velocity: number;
   /** Detection confidence 0-1 */
   confidence: number;
+  /** Pitch bend values (semitones from MIDI note) per Basic Pitch analysis frame.
+   *  Populated only when detected with @spotify/basic-pitch. */
+  pitchBend?: number[];
 }
 
 export type QuantizeGrid = '1/4' | '1/8' | '1/16' | '1/32' | 'off';

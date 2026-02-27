@@ -147,6 +147,7 @@ export async function detectPolyphonic(
       duration: n.durationSeconds,
       velocity: Math.max(1, Math.min(127, Math.round(n.amplitude * 127))),
       confidence: n.amplitude, // Basic Pitch amplitude ≈ confidence proxy
+      pitchBend: n.pitchBends ?? undefined, // expose bend contour from model
     };
   });
 
