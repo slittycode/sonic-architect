@@ -37,7 +37,7 @@ function renderInline(text: string): React.ReactNode {
     )
   );
 }
-function renderMarkdown(text: string): React.ReactNode {
+function renderMarkdown(text: string, textClass = 'text-sm text-indigo-200/80'): React.ReactNode {
   // Pass 1: split into paragraph blocks
   const blocks = text.split(/\n{2,}/);
 
@@ -81,7 +81,7 @@ function renderMarkdown(text: string): React.ReactNode {
   return groups.map((g, gi) => {
     if (g.type === 'ol') {
       return (
-        <ol key={gi} className="list-decimal list-inside space-y-2 text-sm text-indigo-200/80">
+        <ol key={gi} className={`list-decimal list-inside space-y-2 ${textClass}`}>
           {g.items.map((item, ii) => (
             <li key={ii} className="leading-relaxed">
               {renderInline(item)}
@@ -92,7 +92,7 @@ function renderMarkdown(text: string): React.ReactNode {
     }
     if (g.type === 'ul') {
       return (
-        <ul key={gi} className="list-disc list-inside space-y-2 text-sm text-indigo-200/80">
+        <ul key={gi} className={`list-disc list-inside space-y-2 ${textClass}`}>
           {g.items.map((item, ii) => (
             <li key={ii} className="leading-relaxed">
               {renderInline(item)}
@@ -102,7 +102,7 @@ function renderMarkdown(text: string): React.ReactNode {
       );
     }
     return (
-      <p key={gi} className="text-sm text-indigo-200/80 leading-relaxed">
+      <p key={gi} className={`leading-relaxed ${textClass}`}>
         {renderInline(g.content)}
       </p>
     );
@@ -193,9 +193,9 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
                   <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider block mb-1.5">
                     Gemini Verification
                   </span>
-                  <span className="text-xs text-zinc-400 leading-relaxed">
-                    {blueprint.telemetry.verificationNotes}
-                  </span>
+                  <div className="space-y-2">
+                    {renderMarkdown(blueprint.telemetry.verificationNotes, 'text-xs text-zinc-400')}
+                  </div>
                 </div>
               )}
             </div>
