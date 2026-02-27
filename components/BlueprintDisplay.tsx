@@ -55,11 +55,15 @@ function renderMarkdown(text: string): React.ReactNode {
 
     if (isNumbered) {
       const last = groups[groups.length - 1];
-      const content = block.replace(/^\d+[.)]\s*/, '').replace(/\n/g, ' ');
+      // Split on inline numbered transitions: "sentence end. 2. next item"
+      const subItems = block
+        .split(/(?<=[.!?])\s+(?=\d+[.)]\s)/)
+        .map((s) => s.replace(/^\d+[.)]\s*/, '').replace(/\n/g, ' ').trim())
+        .filter(Boolean);
       if (last?.type === 'ol') {
-        last.items.push(content);
+        last.items.push(...subItems);
       } else {
-        groups.push({ type: 'ol', items: [content] });
+        groups.push({ type: 'ol', items: subItems });
       }
     } else if (isBullet) {
       const last = groups[groups.length - 1];
