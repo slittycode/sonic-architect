@@ -215,7 +215,8 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
     let weightedSum = 0;
     let magnitudeSum = 0;
     for (let k = 0; k < fftHalf; k++) {
-      const mag = Math.hypot(real[k], imag[k]);
+      // Normalize by N/2 so a full-scale sine yields magnitude ≈ 1.0 (0 dBFS)
+      const mag = Math.hypot(real[k], imag[k]) / fftHalf;
       spectrum[k] = mag;
       const freq = (k * sampleRate) / FRAME_SIZE;
       weightedSum += freq * mag;

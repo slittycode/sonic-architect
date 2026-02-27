@@ -32,6 +32,16 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               <TelemetryItem label="BPM" value={blueprint.telemetry.bpm} />
               <TelemetryItem label="Key" value={blueprint.telemetry.key} />
               <TelemetryItem label="Groove" value={blueprint.telemetry.groove} />
+              {blueprint.telemetry.verificationNotes && (
+                <div className="p-3 bg-zinc-950 rounded border border-zinc-800">
+                  <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider block mb-1.5">
+                    Gemini Verification
+                  </span>
+                  <span className="text-xs text-zinc-400 leading-relaxed">
+                    {blueprint.telemetry.verificationNotes}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

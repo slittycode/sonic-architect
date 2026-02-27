@@ -104,3 +104,37 @@ These checks are deterministic UI sanity checks and do not call live Gemini/Clau
 - **Web Audio API** — audio decoding, pitch detection, MIDI preview
 - **Tailwind CSS** (CDN) — styling
 - **Lucide React** — icons
+
+## Global CLI Installation
+
+Install `sonic` as a global command to launch from any directory:
+
+```bash
+# One-time installation
+pnpm link --global
+
+# Now you can run from anywhere
+sonic
+```
+
+### How It Works
+
+- The `sonic` command starts the Vite development server
+- Automatically opens Google Chrome to `http://localhost:3000`
+- Hot-reload is enabled - edit code and see changes instantly
+- Press `Ctrl+C` in terminal to stop the server
+
+### Updating After Code Changes
+
+Since `sonic` runs the development server, **no rebuild is needed**:
+
+1. Edit any file in the codebase
+2. Run `sonic` from any terminal directory
+3. Vite hot-reload applies changes automatically
+4. Refresh browser if needed (usually auto-reloads)
+
+### Uninstall
+
+```bash
+pnpm unlink --global
+```

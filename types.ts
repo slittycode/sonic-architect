@@ -4,6 +4,8 @@ export interface GlobalTelemetry {
   groove: string;
   bpmConfidence?: number;
   keyConfidence?: number;
+  /** Gemini cross-verification notes — present when Gemini provider is used. */
+  verificationNotes?: string;
 }
 
 export interface ArrangementSection {

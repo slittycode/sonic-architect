@@ -1,5 +1,7 @@
 import { ReconstructionBlueprint } from '../types';
-import { getStoredAnthropicApiKey } from './claudeProvider';
+
+// Storage key must stay in sync with claudeProvider.ts ANTHROPIC_API_KEY_STORAGE_KEY
+const ANTHROPIC_KEY_STORAGE = 'anthropic_api_key';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -11,8 +13,12 @@ function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  const key = getStoredAnthropicApiKey();
-  if (key) headers['x-api-key'] = key;
+  try {
+    const key = localStorage.getItem(ANTHROPIC_KEY_STORAGE)?.trim() || null;
+    if (key) headers['x-api-key'] = key;
+  } catch {
+    // localStorage unavailable (private browsing, test env, etc.)
+  }
   return headers;
 }
 

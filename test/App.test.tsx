@@ -35,15 +35,15 @@ describe('App', () => {
     expect(await screen.findByText(/invalid file type/i)).toBeInTheDocument();
   });
 
-  it('toggles the Claude chat panel from the toolbar', async () => {
+  it('toggles the AI chat panel from the toolbar', async () => {
     render(<App />);
     const toggle = screen.getByRole('button', { name: /toggle claude chat/i });
 
-    expect(screen.queryByText('Claude Assistant')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Assistant/i)).not.toBeInTheDocument();
     await userEvent.click(toggle);
-    expect(screen.getByText('Claude Assistant')).toBeInTheDocument();
+    expect(screen.getByText(/Assistant/i)).toBeInTheDocument();
 
     await userEvent.click(toggle);
-    expect(screen.queryByText('Claude Assistant')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Assistant/i)).not.toBeInTheDocument();
   });
 });

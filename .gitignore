@@ -31,3 +31,6 @@ verification/*.png
 *.njsproj
 *.sln
 *.sw?
+
+# CLI symlink
+node_modules/.bin/sonic

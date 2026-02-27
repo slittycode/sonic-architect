@@ -20,6 +20,7 @@ import {
 } from '../data/abletonDevices';
 import { generateVitalPatch, generateOperatorPatch } from './patchSmith';
 import { generateMixReport } from './mixDoctor';
+import { detectChords, ChordProgressionResult } from './chordDetection';
 
 /**
  * Segment the RMS energy profile into arrangement sections.
@@ -218,7 +219,8 @@ function describeGroove(features: {
 export function buildLocalBlueprint(
   features: AudioFeatures,
   analysisTime: number,
-  provider: 'local' | 'ollama' = 'local'
+  provider: 'local' | 'ollama' = 'local',
+  chordResult?: ChordProgressionResult
 ): ReconstructionBlueprint {
   const arrangement = detectArrangement(features.rmsProfile, features.duration);
   const instrumentation = getInstrumentRecommendations(features.spectralBands);
@@ -253,6 +255,12 @@ export function buildLocalBlueprint(
     secretSauce,
     patches,
     mixReport,
+    ...(chordResult && chordResult.chords.length > 0
+      ? {
+          chordProgression: chordResult.chords,
+          chordProgressionSummary: chordResult.progression,
+        }
+      : {}),
     meta: {
       provider,
       analysisTime,
@@ -288,7 +296,11 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     const features = extractAudioFeatures(audioBuffer);
     signal?.throwIfAborted();
 
+    // Chord detection — runs on the same AudioBuffer
+    const chordResult = detectChords(audioBuffer);
+    signal?.throwIfAborted();
+
     const analysisTime = Math.round(performance.now() - startTime);
-    return buildLocalBlueprint(features, analysisTime, 'local');
+    return buildLocalBlueprint(features, analysisTime, 'local', chordResult);
   }
 }

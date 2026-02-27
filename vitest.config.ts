@@ -15,8 +15,7 @@ export default defineConfig({
     },
   },
   define: {
-    'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(
-      process.env.VITE_GEMINI_API_KEY ?? 'test-key'
-    ),
+    // Use empty string in tests so provider defaults to 'local' and no real API calls are made.
+    'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(''),
   },
 });

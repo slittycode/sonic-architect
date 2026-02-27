@@ -36,12 +36,19 @@ const localProvider = new LocalAnalysisProvider();
 const ollamaProvider = new OllamaProvider(localProvider);
 
 function getStoredProvider(): ProviderType {
+  const hasGeminiKey =
+    typeof import.meta.env.VITE_GEMINI_API_KEY === 'string' &&
+    import.meta.env.VITE_GEMINI_API_KEY.length > 0;
   try {
     const stored = localStorage.getItem('sonic-architect-provider');
-    if (stored === 'gemini' || stored === 'local' || stored === 'ollama' || stored === 'claude')
+    if (stored === 'gemini' || stored === 'local' || stored === 'ollama')
       return stored as ProviderType;
+    // If 'claude' was stored from a previous session but no Anthropic key is configured,
+    // prefer Gemini (if available) so the app doesn't immediately show an Anthropic error.
+    if (stored === 'claude') return hasGeminiKey ? 'gemini' : 'local';
   } catch {}
-  return 'local';
+  // Fresh install: default to Gemini when key is configured, otherwise offline.
+  return hasGeminiKey ? 'gemini' : 'local';
 }
 
 function getErrorName(error: unknown): string | null {
@@ -292,6 +299,10 @@ const App: React.FC = () => {
     }
   }, [isPlaying]);
 
+  // Use ref to avoid re-subscribing keyboard listener when togglePlayback changes
+  const togglePlaybackRef = useRef(togglePlayback);
+  togglePlaybackRef.current = togglePlayback;
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
@@ -300,18 +311,18 @@ const App: React.FC = () => {
 
         event.preventDefault();
         if (audioUrl) {
-          togglePlayback();
+          togglePlaybackRef.current();
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlayback, audioUrl]);
+  }, [audioUrl]);
 
   const providerLabel =
     providerType === 'gemini'
-      ? 'Gemini 1.5 Pro'
+      ? 'Gemini 2.0 Flash'
       : providerType === 'claude'
         ? 'Claude'
         : providerType === 'ollama'
@@ -328,11 +339,9 @@ const App: React.FC = () => {
               <AudioLines className="w-6 h-6 text-white" aria-hidden="true" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-zinc-100 uppercase">
-                Sonic Architect
-              </h1>
+              <h1 className="text-xl font-bold tracking-tight text-zinc-100">Sonic Architect</h1>
               <p className="text-[10px] text-zinc-500 mono tracking-widest uppercase">
-                Ableton Live 12 Deconstructor v2.0
+                Sonic Analyzer for Ableton
               </p>
             </div>
           </div>
@@ -373,9 +382,9 @@ const App: React.FC = () => {
                   >
                     <Cloud className="w-4 h-4 text-blue-400 flex-shrink-0" aria-hidden="true" />
                     <div>
-                      <p className="text-sm font-medium text-zinc-200">Gemini 1.5 Pro</p>
+                      <p className="text-sm font-medium text-zinc-200">Gemini 2.0 Flash</p>
                       <p className="text-[10px] text-zinc-500">
-                        Cloud AI analysis. Requires API key in .env.local.
+                        Hybrid local+cloud · GEMINI_API_KEY in .env.local
                       </p>
                     </div>
                   </button>
@@ -512,21 +521,21 @@ const App: React.FC = () => {
                 <div className="flex flex-col">
                   <span className="text-sm font-semibold text-blue-200">
                     {providerType === 'gemini'
-                      ? 'Neural Engine Analyzing Spectrogram...'
+                      ? 'Running Local DSP + Gemini 2.0 Flash Enrichment...'
                       : providerType === 'claude'
-                        ? 'Claude Analyzing Spectrogram...'
+                        ? 'Running Local DSP + Claude Enrichment...'
                         : providerType === 'ollama'
                           ? 'Analyzing Audio + Preparing Ollama Enhancement...'
                           : 'Analyzing Audio Spectrogram...'}
                   </span>
                   <span className="text-xs text-blue-400/80">
                     {providerType === 'gemini'
-                      ? 'Identifying transients, frequency domains, and device chains...'
+                      ? 'BPM/key from local DSP — Gemini enriching timbre, devices, and technique descriptions...'
                       : providerType === 'claude'
-                        ? 'Reconstructing signal paths with Anthropic intelligence...'
+                        ? 'BPM/key from local DSP — Claude enriching descriptions with Ableton expertise...'
                         : providerType === 'ollama'
                           ? 'Running local DSP first, then enriching descriptions with Ollama...'
-                          : 'Extracting BPM, key, spectral features, and onset data...'}
+                          : 'Extracting BPM, key, spectral features, chords, and onset data...'}
                   </span>
                 </div>
               </div>
@@ -588,7 +597,11 @@ const App: React.FC = () => {
                     ? 'Local DSP'
                     : blueprint.meta.provider === 'ollama'
                       ? 'Ollama + Local DSP'
-                      : 'Gemini 1.5 Pro'}
+                      : blueprint.meta.provider === 'gemini'
+                        ? 'Gemini 2.0 Flash + Local DSP'
+                        : blueprint.meta.provider === 'claude'
+                          ? 'Claude + Local DSP'
+                          : blueprint.meta.provider}
                 </span>
                 <span className="text-zinc-700">|</span>
                 <span>Analyzed in {blueprint.meta.analysisTime}ms</span>
@@ -655,7 +668,7 @@ const App: React.FC = () => {
         )}
 
         {/* Chat Panel — renders when toggled */}
-        {showChat && <ChatPanel blueprint={blueprint} />}
+        {showChat && <ChatPanel blueprint={blueprint} providerType={providerType} />}
 
         {!blueprint && status === AnalysisStatus.IDLE && (
           <div className="flex flex-col items-center justify-center py-24 text-center space-y-6">
@@ -668,10 +681,12 @@ const App: React.FC = () => {
                 Upload an audio file to generate a complete Ableton Live 12 reconstruction
                 blueprint.
                 {providerType === 'gemini'
-                  ? ' Our neural engine will map out every device and signal path.'
-                  : providerType === 'ollama'
-                    ? ' Core analysis runs locally; Ollama enhances the descriptive output when available.'
-                    : ' Analysis runs locally in your browser — no API key needed.'}
+                  ? ' Local DSP measures BPM, key, and spectrum precisely — Gemini 2.0 Flash enriches descriptions and Ableton device recommendations.'
+                  : providerType === 'claude'
+                    ? ' Local DSP measures BPM, key, and spectrum precisely — Claude enriches descriptions with Ableton expertise.'
+                    : providerType === 'ollama'
+                      ? ' Core analysis runs locally; Ollama enhances the descriptive output when available.'
+                      : ' Analysis runs entirely in your browser — no API key needed.'}
               </p>
             </div>
             <button

@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, MessageSquare, Trash2 } from 'lucide-react';
 import { ClaudeChatService } from '../services/chatService';
-import { ReconstructionBlueprint } from '../types';
+import { ReconstructionBlueprint, ProviderType } from '../types';
 
 interface ChatPanelProps {
   blueprint: ReconstructionBlueprint | null;
+  /** Active provider — determines which chat backend to use */
+  providerType?: ProviderType;
 }
 
 interface Message {
@@ -12,19 +14,48 @@ interface Message {
   content: string;
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint }) => {
+// Shared interface both services satisfy
+interface ChatService {
+  sendMessage(text: string): Promise<ReadableStream<string>>;
+  clearHistory(): void;
+}
+
+function providerLabel(providerType: ProviderType | undefined): string {
+  if (providerType === 'gemini') return 'Gemini Assistant';
+  if (providerType === 'claude') return 'Claude Assistant';
+  // local / ollama: label reflects cloud enrichment if key present
+  const hasGeminiKey =
+    typeof import.meta.env.VITE_GEMINI_API_KEY === 'string' &&
+    import.meta.env.VITE_GEMINI_API_KEY.length > 0;
+  return hasGeminiKey ? 'Gemini Assistant' : 'Production Assistant';
+}
+
+const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint, providerType }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatServiceRef = useRef<ClaudeChatService | null>(null);
+  const chatServiceRef = useRef<ChatService | null>(null);
 
   useEffect(() => {
-    chatServiceRef.current = new ClaudeChatService(blueprint ? () => blueprint : null);
+    const hasGeminiKey =
+      typeof import.meta.env.VITE_GEMINI_API_KEY === 'string' &&
+      import.meta.env.VITE_GEMINI_API_KEY.length > 0;
+    const blueprintGetter = blueprint ? () => blueprint : null;
+
     setMessages([]);
     setError(null);
-  }, [blueprint]);
+
+    if (providerType === 'gemini' || (hasGeminiKey && providerType !== 'claude')) {
+      // Lazy-load so geminiService stays in its own chunk (not pulled into main bundle)
+      void import('../services/geminiService').then(({ GeminiChatService }) => {
+        chatServiceRef.current = new GeminiChatService(blueprintGetter);
+      });
+    } else {
+      chatServiceRef.current = new ClaudeChatService(blueprintGetter);
+    }
+  }, [blueprint, providerType]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,7 +121,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint }) => {
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-blue-400" />
-          <h2 className="text-sm font-semibold text-zinc-200">Claude Assistant</h2>
+          <h2 className="text-sm font-semibold text-zinc-200">{providerLabel(providerType)}</h2>
           {blueprint && (
             <span className="text-[10px] px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded-full">
               Blueprint linked

@@ -80,6 +80,7 @@ export function generateMixReport(
   // Evaluate dynamics (Crest Factor)
   let dynamicsIssue: 'too-compressed' | 'too-dynamic' | 'optimal' = 'optimal';
   let dynamicsMsg = 'Solid dynamic range. Fits the genre well.';
+  let dynamicsPenalty = 0;
 
   const crest = features.crestFactor;
   const [minCrest, maxCrest] = profile.targetCrestFactorRange;
@@ -88,16 +89,20 @@ export function generateMixReport(
     dynamicsIssue = 'too-compressed';
     dynamicsMsg =
       'Too compressed/squashed. The mix lacks transient punch. Ease off the master limiter or bus compressors.';
-    scoreAccumulator -= 10; // penalty
+    // Proportional penalty: 2.5 pts per dB outside range, capped at 15
+    dynamicsPenalty = Math.min(15, (minCrest - crest) * 2.5);
   } else if (crest > maxCrest) {
     dynamicsIssue = 'too-dynamic';
     dynamicsMsg =
       'Too dynamic. Transients are jumping out too much. Add bus compression or saturation to glue the mix.';
-    scoreAccumulator -= 10; // penalty
+    dynamicsPenalty = Math.min(15, (crest - maxCrest) * 2.5);
   }
 
   // Final score 0 - 100
+  // Compute band average first, then subtract dynamics penalty so its impact
+  // is consistent regardless of how many bands were evaluated.
   let overallScore = bandsEvaluated > 0 ? scoreAccumulator / bandsEvaluated : 0;
+  overallScore -= dynamicsPenalty;
   overallScore = Math.round(Math.max(0, Math.min(100, overallScore)));
 
   return {

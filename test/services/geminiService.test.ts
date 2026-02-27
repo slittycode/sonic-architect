@@ -1,88 +1,95 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { analyzeAudio } from '../../services/geminiService';
+import { describe, it, expect } from 'vitest';
+import { parseGeminiEnhancement, mergeGeminiEnhancement } from '../../services/geminiService';
+import type { ReconstructionBlueprint } from '../../types';
 
-const validBlueprintJson = JSON.stringify({
-  telemetry: { bpm: '120', key: 'C major', groove: 'straight' },
-  arrangement: [{ timeRange: '0:00-0:15', label: 'Intro', description: 'Build' }],
+const baseBlueprint: ReconstructionBlueprint = {
+  telemetry: { bpm: '128', key: 'F minor', groove: 'Straight 4/4 groove' },
+  arrangement: [{ timeRange: '0:00–0:16', label: 'Intro', description: 'Sparse intro' }],
   instrumentation: [
+    { element: 'Sub Bass', timbre: 'Warm sine', frequency: 'Sub', abletonDevice: 'Operator' },
     {
-      element: 'Bass',
-      timbre: 'Warm',
-      frequency: 'Low',
-      abletonDevice: 'Operator',
+      element: 'Lead Synth',
+      timbre: 'Bright saw',
+      frequency: 'Upper mids',
+      abletonDevice: 'Wavetable',
     },
   ],
-  fxChain: [{ artifact: 'Reverb', recommendation: 'Reverb device' }],
-  secretSauce: { trick: 'Sidechain', execution: 'Use Compressor' },
+  fxChain: [{ artifact: 'Reverb tail', recommendation: 'Hybrid Reverb' }],
+  secretSauce: {
+    trick: 'Sidechain pump',
+    execution: 'Use Compressor sidechain from kick',
+  },
+};
+
+describe('geminiService — parseGeminiEnhancement', () => {
+  it('parses valid enhancement JSON', () => {
+    const raw = JSON.stringify({
+      groove: 'Driving 4-on-the-floor with heavy swing',
+      instrumentation: [
+        {
+          element: 'Sub Bass',
+          timbre: 'Deep rounded sub',
+          abletonDevice: 'Operator FM, sine carrier, attack 10ms',
+        },
+      ],
+      fxChain: [{ artifact: 'Reverb tail', recommendation: 'Hybrid Reverb: Shimmer 18%' }],
+      secretSauce: { trick: 'Parallel compression', execution: 'Mix via Rack macro' },
+    });
+    const result = parseGeminiEnhancement(raw);
+    expect(result).not.toBeNull();
+    expect(result?.groove).toBe('Driving 4-on-the-floor with heavy swing');
+    expect(result?.instrumentation?.[0].timbre).toContain('sub');
+  });
+
+  it('returns null for invalid JSON', () => {
+    expect(parseGeminiEnhancement('not json {')).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(parseGeminiEnhancement('')).toBeNull();
+  });
+
+  it('strips markdown code fences before parsing', () => {
+    const raw = '```json\n{"groove":"smooth"}\n```';
+    const result = parseGeminiEnhancement(raw);
+    expect(result?.groove).toBe('smooth');
+  });
 });
 
-const mockGenerateContent = vi.hoisted(() => vi.fn());
-
-vi.mock('@google/genai', () => ({
-  GoogleGenAI: vi.fn().mockImplementation(function (this: unknown) {
-    return {
-      models: {
-        generateContent: mockGenerateContent,
-      },
-    };
-  }),
-}));
-
-describe('geminiService', () => {
-  beforeEach(() => {
-    mockGenerateContent.mockReset();
+describe('geminiService — mergeGeminiEnhancement', () => {
+  it('merges enhanced groove into blueprint without changing measured values', () => {
+    const merged = mergeGeminiEnhancement(baseBlueprint, { groove: 'Bouncy syncopated' });
+    expect(merged.telemetry.groove).toBe('Bouncy syncopated');
+    expect(merged.telemetry.bpm).toBe('128');
+    expect(merged.telemetry.key).toBe('F minor');
   });
 
-  it('returns valid blueprint when Gemini returns valid JSON', async () => {
-    mockGenerateContent.mockResolvedValue({ text: validBlueprintJson });
-
-    const result = await analyzeAudio('base64data', 'audio/wav');
-
-    expect(result.telemetry.bpm).toBe('120');
-    expect(result.telemetry.key).toBe('C major');
-    expect(result.secretSauce.trick).toBe('Sidechain');
-    expect(Array.isArray(result.arrangement)).toBe(true);
-    expect(Array.isArray(result.instrumentation)).toBe(true);
-    expect(Array.isArray(result.fxChain)).toBe(true);
-  });
-
-  it('throws when Gemini response is invalid JSON', async () => {
-    mockGenerateContent.mockResolvedValue({ text: 'not valid json {' });
-
-    await expect(analyzeAudio('base64data', 'audio/wav')).rejects.toThrow(
-      'Could not parse analysis results. Please try again.'
-    );
-  });
-
-  it('throws when Gemini response is valid JSON but missing required keys', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify({
-        telemetry: { bpm: '120', key: 'C', groove: 'x' },
-        arrangement: [],
-        instrumentation: [],
-        fxChain: [],
-        // missing secretSauce
-      }),
+  it('merges instrumentation timbre and device by element name', () => {
+    const merged = mergeGeminiEnhancement(baseBlueprint, {
+      instrumentation: [
+        {
+          element: 'Lead Synth',
+          timbre: 'Glassy detuned saw',
+          abletonDevice: 'Wavetable: Saw + Detuned, Filter cutoff 2kHz',
+        },
+      ],
     });
-
-    await expect(analyzeAudio('base64data', 'audio/wav')).rejects.toThrow(
-      'Invalid analysis result; please try again.'
-    );
+    const lead = merged.instrumentation.find((i) => i.element === 'Lead Synth')!;
+    expect(lead.timbre).toBe('Glassy detuned saw');
+    expect(lead.abletonDevice).toContain('Wavetable');
+    // Other instruments unchanged
+    expect(merged.instrumentation.find((i) => i.element === 'Sub Bass')?.timbre).toBe('Warm sine');
   });
 
-  it('throws when telemetry is missing required fields', async () => {
-    mockGenerateContent.mockResolvedValue({
-      text: JSON.stringify({
-        telemetry: { bpm: '120' }, // missing key, groove
-        arrangement: [],
-        instrumentation: [],
-        fxChain: [],
-        secretSauce: { trick: 't', execution: 'e' },
-      }),
+  it('ignores elements not present in blueprint', () => {
+    const merged = mergeGeminiEnhancement(baseBlueprint, {
+      instrumentation: [{ element: 'Ghost Track', timbre: 'Should be ignored' }],
     });
+    expect(merged.instrumentation).toHaveLength(2);
+  });
 
-    await expect(analyzeAudio('base64data', 'audio/wav')).rejects.toThrow(
-      'Invalid analysis result; please try again.'
-    );
+  it('returns original blueprint when enhancement is null', () => {
+    const merged = mergeGeminiEnhancement(baseBlueprint, null);
+    expect(merged).toEqual(baseBlueprint);
   });
 });

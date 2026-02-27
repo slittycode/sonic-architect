@@ -1,8 +1,11 @@
 {
-  "name": "sonic-architect:-ableton-deconstructor",
+  "name": "sonic-architect-ableton-deconstructor",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "bin": {
+    "sonic": "./bin/sonic.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

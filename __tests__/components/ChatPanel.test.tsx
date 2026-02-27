@@ -16,6 +16,15 @@ vi.mock('../../services/chatService', () => ({
   },
 }));
 
+vi.mock('../../services/geminiService', () => ({
+  GeminiChatService: class GeminiChatServiceMock {
+    sendMessage = sendMessageMock;
+    clearHistory = clearHistoryMock;
+  },
+  parseGeminiEnhancement: vi.fn(),
+  mergeGeminiEnhancement: vi.fn(),
+}));
+
 function makeBlueprint(): ReconstructionBlueprint {
   return {
     telemetry: {
@@ -56,7 +65,7 @@ describe('ChatPanel', () => {
   it('renders empty state and blueprint context badge', () => {
     render(<ChatPanel blueprint={makeBlueprint()} />);
 
-    expect(screen.getByText('Claude Assistant')).toBeInTheDocument();
+    expect(screen.getByText(/Assistant/i)).toBeInTheDocument();
     expect(screen.getByText('Blueprint linked')).toBeInTheDocument();
     expect(screen.getByText(/Ask me anything about your audio analysis/i)).toBeInTheDocument();
   });

@@ -177,9 +177,9 @@ describe('App integration flow', () => {
     render(<App />);
 
     fireEvent.click(screen.getByLabelText(/analysis engine settings/i));
-    fireEvent.click(screen.getByText('Gemini 1.5 Pro'));
+    fireEvent.click(screen.getByText('Gemini 2.0 Flash'));
 
     expect(localStorage.getItem('sonic-architect-provider')).toBe('gemini');
-    expect(screen.getByText('Gemini 1.5 Pro')).toBeInTheDocument();
+    expect(screen.getByText('Gemini 2.0 Flash')).toBeInTheDocument();
   });
 });
