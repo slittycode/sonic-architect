@@ -17,6 +17,9 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Worktrees
+.worktrees/
+
 # Agent / AI tool artifacts
 .jules/
 verification/*.png
