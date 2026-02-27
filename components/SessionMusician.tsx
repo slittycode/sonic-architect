@@ -34,6 +34,10 @@ interface SessionMusicianProps {
   error: string | null;
   /** Original audio file name (for naming the MIDI download) */
   fileName: string | null;
+  /** Whether polyphonic (Basic Pitch) mode is active */
+  polyMode?: boolean;
+  /** Toggle polyphonic mode */
+  onPolyModeChange?: (enabled: boolean) => void;
 }
 
 // ── Grid options ───────────────────────────────────────────────────────────────
@@ -163,6 +167,8 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
   detecting,
   error,
   fileName,
+  polyMode = false,
+  onPolyModeChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<PreviewHandle | null>(null);
@@ -262,7 +268,9 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-violet-200">Detecting pitches…</span>
             <span className="text-xs text-violet-400/80">
-              Running YIN autocorrelation on audio frames
+              {polyMode
+                ? 'Running Basic Pitch polyphonic detection (TF.js)'
+                : 'Running YIN autocorrelation on audio frames'}
             </span>
           </div>
         </div>
@@ -336,6 +344,26 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
             <Download className="w-3.5 h-3.5" />
             Download .mid
           </button>
+
+          {/* Poly/Mono mode toggle */}
+          {onPolyModeChange && (
+            <button
+              onClick={() => onPolyModeChange(!polyMode)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-all border ${
+                polyMode
+                  ? 'bg-amber-800/40 text-amber-200 border-amber-700/40 hover:bg-amber-700/50'
+                  : 'bg-zinc-800/40 text-zinc-500 border-zinc-800 hover:text-zinc-300 hover:bg-zinc-800'
+              }`}
+              title={
+                polyMode
+                  ? 'Polyphonic mode (Basic Pitch) — re-analyze to apply'
+                  : 'Monophonic mode (YIN) — switch to poly for chords/multi-note'
+              }
+            >
+              <Music2 className="w-3.5 h-3.5" />
+              {polyMode ? 'Poly' : 'Mono'}
+            </button>
+          )}
 
           {/* Collapse toggle */}
           <button
@@ -422,9 +450,10 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
           <div className="flex items-start gap-2 mt-3 text-[10px] text-zinc-600">
             <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
             <span>
-              Monophonic pitch detection via YIN autocorrelation. Best results with clean,
-              single-instrument stems. Adjust quantization to snap notes to the rhythmic grid before
-              downloading.
+              {polyMode
+                ? 'Polyphonic detection via Spotify Basic Pitch (TF.js). Handles chords, multi-instrument audio, and complex polyphony. Toggle to Mono for single-instrument stems.'
+                : 'Monophonic pitch detection via YIN autocorrelation. Best results with clean, single-instrument stems. Toggle to Poly for chords and multi-note content.'}
+              {' '}Adjust quantization to snap notes to the rhythmic grid before downloading.
             </span>
           </div>
         </>

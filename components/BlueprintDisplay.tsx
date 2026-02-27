@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles } from 'lucide-react';
+import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles, Drum, Fingerprint } from 'lucide-react';
 import { ReconstructionBlueprint } from '../types';
 import MixDoctorPanel from './MixDoctorPanel';
 
@@ -31,7 +31,48 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
             <div className="p-5 grid grid-cols-1 gap-4">
               <TelemetryItem label="BPM" value={blueprint.telemetry.bpm} />
               <TelemetryItem label="Key" value={blueprint.telemetry.key} />
+              {blueprint.telemetry.detectedGenre && (
+                <TelemetryItem label="Genre" value={blueprint.telemetry.detectedGenre} />
+              )}
               <TelemetryItem label="Groove" value={blueprint.telemetry.groove} />
+
+              {/* Beat Tracking */}
+              {blueprint.telemetry.beatPositions && blueprint.telemetry.beatPositions.length > 0 && (
+                <div className="p-3 bg-zinc-950 rounded border border-zinc-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Drum className="w-3 h-3 text-cyan-400" />
+                    <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">
+                      Beat Grid
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-zinc-300 mono">
+                      {blueprint.telemetry.beatPositions.length} beats detected
+                    </span>
+                    {blueprint.telemetry.downbeatPosition !== undefined && (
+                      <span className="text-cyan-400/70 mono">
+                        ↓1 @ {blueprint.telemetry.downbeatPosition.toFixed(3)}s
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex gap-px h-3 overflow-hidden rounded">
+                    {blueprint.telemetry.beatPositions.slice(0, 64).map((beat, i) => {
+                      const isDownbeat = beat === blueprint.telemetry.downbeatPosition;
+                      return (
+                        <div
+                          key={i}
+                          className={`flex-1 min-w-[2px] rounded-sm ${isDownbeat ? 'bg-cyan-400' : i % 4 === 0 ? 'bg-zinc-500' : 'bg-zinc-700'}`}
+                          title={`Beat ${i + 1}: ${beat.toFixed(3)}s`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-zinc-600 mt-1.5">
+                    Use beat positions as Ableton warp markers for sample-accurate alignment.
+                  </p>
+                </div>
+              )}
+
               {blueprint.telemetry.verificationNotes && (
                 <div className="p-3 bg-zinc-950 rounded border border-zinc-800">
                   <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider block mb-1.5">
@@ -117,6 +158,58 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               ))}
             </div>
           </div>
+
+          {/* MFCC Timbre Fingerprint */}
+          {blueprint.mfcc && blueprint.mfcc.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg">
+              <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+                <Fingerprint className="w-4 h-4 text-teal-400" aria-hidden="true" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                  Timbre Fingerprint (MFCC)
+                </h3>
+              </div>
+              <div className="p-5">
+                <p className="text-[10px] text-zinc-500 mb-3">
+                  13 Mel-Frequency Cepstral Coefficients capturing the timbral character of the audio.
+                </p>
+                <div className="flex items-end gap-1 h-16">
+                  {blueprint.mfcc.map((coeff, i) => {
+                    // Normalize coefficients for display (c0 is energy, often much larger)
+                    const maxAbs = Math.max(...blueprint.mfcc!.map(Math.abs), 1);
+                    const normalized = coeff / maxAbs;
+                    const height = Math.abs(normalized) * 100;
+                    const isPositive = normalized >= 0;
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 flex flex-col items-center justify-end h-full"
+                        title={`C${i}: ${coeff.toFixed(2)}`}
+                      >
+                        <div
+                          className={`w-full rounded-sm ${isPositive ? 'bg-teal-500/60' : 'bg-rose-500/40'}`}
+                          style={{ height: `${Math.max(2, height)}%` }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-1 text-[8px] mono text-zinc-600">
+                  <span>C0 (energy)</span>
+                  <span>C6 (detail)</span>
+                  <span>C12 (fine)</span>
+                </div>
+                <div className="mt-3 text-[10px] text-zinc-600 leading-relaxed">
+                  {blueprint.mfcc[1] > 0
+                    ? 'Positive C1 → brighter, harmonically rich timbre.'
+                    : 'Negative C1 → darker, warmer timbral character.'}
+                  {' '}
+                  {Math.abs(blueprint.mfcc[0]) > 10
+                    ? 'High C0 energy — full, loud source material.'
+                    : 'Moderate C0 — balanced energy level.'}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Patch Smith Section */}
           {blueprint.patches && (

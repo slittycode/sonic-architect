@@ -6,6 +6,20 @@ export interface GlobalTelemetry {
   keyConfidence?: number;
   /** Gemini cross-verification notes — present when Gemini provider is used. */
   verificationNotes?: string;
+  /** Genre detected by classification or LLM verification. */
+  detectedGenre?: string;
+  /** True when Gemini overrode the local DSP key estimate. */
+  keyCorrectedByGemini?: boolean;
+  /** Original local DSP key estimate before Gemini correction. */
+  localKeyEstimate?: string;
+  /** True when Gemini overrode the local DSP BPM estimate. */
+  bpmCorrectedByGemini?: boolean;
+  /** Original local DSP BPM estimate before Gemini correction. */
+  localBpmEstimate?: string;
+  /** Beat positions in seconds from DP beat tracker. For Ableton warp markers. */
+  beatPositions?: number[];
+  /** Downbeat (bar start) position in seconds. For clip launch alignment. */
+  downbeatPosition?: number;
 }
 
 export interface ArrangementSection {
@@ -60,6 +74,8 @@ export interface ReconstructionBlueprint {
     operator?: string;
   };
   mixReport?: MixDoctorReport;
+  /** Mean MFCC coefficients (13 values) — timbre fingerprint. */
+  mfcc?: number[];
   meta?: AnalysisMeta;
 }
 
@@ -96,6 +112,20 @@ export interface AudioFeatures {
   duration: number;
   sampleRate: number;
   channels: number;
+  /** ITU-R BS.1770-4 integrated loudness in LUFS. */
+  lufsIntegrated?: number;
+  /** True peak level in dBTP. */
+  truePeak?: number;
+  /** L/R phase correlation: -1 (out of phase) to +1 (mono). Only set for stereo. */
+  stereoCorrelation?: number;
+  /** Stereo width: 0 (mono) to 1 (fully decorrelated). Only set for stereo. */
+  stereoWidth?: number;
+  /** Whether the mix is mono-compatible (no per-band phase cancellation). */
+  monoCompatible?: boolean;
+  /** Per-band energy over time for spectral timeline visualization. */
+  spectralTimeline?: SpectralTimeline;
+  /** Mean MFCC coefficients (13 values) — timbre fingerprint. */
+  mfcc?: number[];
 }
 
 export interface SpectralBandEnergy {
@@ -104,6 +134,22 @@ export interface SpectralBandEnergy {
   averageDb: number;
   peakDb: number;
   dominance: 'dominant' | 'present' | 'weak' | 'absent';
+}
+
+// --- Spectral Timeline (per-band energy over time) ---
+
+export interface SpectralTimelineBand {
+  /** Band name, e.g. "Sub Bass", "Mids" */
+  name: string;
+  /** Energy values in dB at each time point */
+  energyDb: number[];
+}
+
+export interface SpectralTimeline {
+  /** Time positions in seconds, one per column */
+  timePoints: number[];
+  /** Per-band energy series, one entry per spectral band */
+  bands: SpectralTimelineBand[];
 }
 
 // --- Session Musician (Audio-to-MIDI) ---
@@ -159,6 +205,8 @@ export interface GenreProfile {
   targetCrestFactorRange: [number, number];
   /** Target average dB profiles for spectral bands */
   spectralTargets: Record<string, { minDb: number; maxDb: number; optimalDb: number }>;
+  /** Target integrated loudness range in LUFS (e.g. [-16, -12] for EDM) */
+  targetLufsRange?: [number, number];
 }
 
 export interface MixAdvice {
@@ -176,6 +224,18 @@ export interface MixDoctorReport {
     issue: 'too-compressed' | 'too-dynamic' | 'optimal';
     message: string;
     actualCrest: number;
+  };
+  loudnessAdvice?: {
+    issue: 'too-loud' | 'too-quiet' | 'optimal';
+    message: string;
+    actualLufs: number;
+    truePeak: number;
+  };
+  stereoAdvice?: {
+    correlation: number;
+    width: number;
+    monoCompatible: boolean;
+    message: string;
   };
   overallScore: number; // 0-100 indicating closeness to genre profile
 }

@@ -98,11 +98,71 @@ export function generateMixReport(
     dynamicsPenalty = Math.min(15, (crest - maxCrest) * 2.5);
   }
 
+  // --- Evaluate LUFS loudness ---
+  let loudnessAdvice: MixDoctorReport['loudnessAdvice'];
+  let loudnessPenalty = 0;
+
+  if (features.lufsIntegrated != null && features.truePeak != null && profile.targetLufsRange) {
+    const lufs = features.lufsIntegrated;
+    const [minLufs, maxLufs] = profile.targetLufsRange;
+    let loudnessIssue: 'too-loud' | 'too-quiet' | 'optimal' = 'optimal';
+    let loudnessMsg = `Loudness is on target at ${lufs} LUFS. Good for streaming platforms.`;
+
+    if (lufs > maxLufs) {
+      loudnessIssue = 'too-loud';
+      loudnessMsg = `Too loud at ${lufs} LUFS (target: ${maxLufs} LUFS max for ${profile.name}). Streaming platforms will turn it down — reduce limiter gain.`;
+      loudnessPenalty = Math.min(10, (lufs - maxLufs) * 2);
+    } else if (lufs < minLufs) {
+      loudnessIssue = 'too-quiet';
+      loudnessMsg = `Quiet at ${lufs} LUFS (target: ${minLufs} LUFS min for ${profile.name}). Consider adding gain or a limiter to bring up overall level.`;
+      loudnessPenalty = Math.min(10, (minLufs - lufs) * 2);
+    }
+
+    // True peak warning
+    if (features.truePeak > -1) {
+      loudnessMsg += ` True peak at ${features.truePeak} dBTP — risk of clipping on codec conversion. Target -1 dBTP ceiling.`;
+      loudnessPenalty += 3;
+    }
+
+    loudnessAdvice = {
+      issue: loudnessIssue,
+      message: loudnessMsg,
+      actualLufs: lufs,
+      truePeak: features.truePeak,
+    };
+  }
+
+  // --- Evaluate stereo field ---
+  let stereoAdvice: MixDoctorReport['stereoAdvice'];
+  let stereoPenalty = 0;
+
+  if (features.stereoCorrelation != null && features.stereoWidth != null) {
+    const corr = features.stereoCorrelation;
+    const width = features.stereoWidth;
+    const mono = features.monoCompatible ?? true;
+    let stereoMsg = `Stereo field looks good — correlation ${corr}, width ${Math.round(width * 100)}%.`;
+
+    if (!mono) {
+      stereoMsg = `Phase cancellation detected in low frequencies. Bass will lose energy on mono playback (PA systems, phone speakers). Narrow your sub bass to mono.`;
+      stereoPenalty = 5;
+    } else if (corr < 0.2) {
+      stereoMsg = `Very wide stereo image (correlation ${corr}). May sound thin when summed to mono. Consider narrowing bass and mid elements.`;
+      stereoPenalty = 3;
+    } else if (corr > 0.95 && width < 0.05) {
+      stereoMsg = `Nearly mono — very narrow stereo image. Consider widening with stereo delay, chorus, or panning elements.`;
+      stereoPenalty = 2;
+    }
+
+    stereoAdvice = { correlation: corr, width, monoCompatible: mono, message: stereoMsg };
+  }
+
   // Final score 0 - 100
-  // Compute band average first, then subtract dynamics penalty so its impact
-  // is consistent regardless of how many bands were evaluated.
+  // Compute band average first, then subtract dynamics + loudness + stereo penalties so
+  // their impact is consistent regardless of how many bands were evaluated.
   let overallScore = bandsEvaluated > 0 ? scoreAccumulator / bandsEvaluated : 0;
   overallScore -= dynamicsPenalty;
+  overallScore -= loudnessPenalty;
+  overallScore -= stereoPenalty;
   overallScore = Math.round(Math.max(0, Math.min(100, overallScore)));
 
   return {
@@ -114,6 +174,8 @@ export function generateMixReport(
       message: dynamicsMsg,
       actualCrest: Math.round(crest * 10) / 10,
     },
+    loudnessAdvice,
+    stereoAdvice,
     overallScore,
   };
 }

@@ -8,6 +8,9 @@
 import { AudioFeatures, SpectralBandEnergy } from '../types';
 import { detectBPM } from './bpmDetection';
 import { detectKey } from './keyDetection';
+import { measureLoudness } from './loudness';
+import { analyzeStereoField } from './stereoAnalysis';
+import { extractMFCC } from './mfcc';
 
 // Spectral band definitions
 const SPECTRAL_BANDS: { name: string; range: [number, number] }[] = [
@@ -289,6 +292,15 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
     };
   });
 
+  // --- LUFS loudness measurement ---
+  const loudness = measureLoudness(audioBuffer);
+
+  // --- Stereo field analysis ---
+  const stereo = analyzeStereoField(audioBuffer);
+
+  // --- MFCC timbre fingerprint ---
+  const mfccResult = extractMFCC(audioBuffer);
+
   return {
     bpm,
     bpmConfidence,
@@ -303,5 +315,11 @@ export function extractAudioFeatures(audioBuffer: AudioBuffer): AudioFeatures {
     duration,
     sampleRate,
     channels: audioBuffer.numberOfChannels,
+    lufsIntegrated: loudness.lufsIntegrated,
+    truePeak: loudness.truePeak,
+    stereoCorrelation: stereo.phaseCorrelation,
+    stereoWidth: stereo.stereoWidth,
+    monoCompatible: stereo.monoCompatible,
+    mfcc: mfccResult.mean,
   };
 }

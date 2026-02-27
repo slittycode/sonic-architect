@@ -111,3 +111,159 @@ export function detectBPM(audioBuffer: AudioBuffer): { bpm: number; confidence: 
 
   return { bpm, confidence };
 }
+
+// --- Dynamic Programming Beat Tracker ---
+
+export interface BeatTrackResult {
+  /** Beat positions in seconds. */
+  beats: number[];
+  /** Estimated downbeat (bar "1") position in seconds. */
+  downbeat: number;
+  /** Tempo used for tracking. */
+  bpm: number;
+}
+
+/**
+ * Track individual beat positions using dynamic programming.
+ *
+ * Given a tempo hypothesis (from detectBPM), finds the sequence of onset peaks
+ * that best aligns with a regular beat grid, allowing local tempo variation.
+ * Also identifies the downbeat via onset-energy accumulation at candidate phases.
+ *
+ * Dixon 2001 / Ellis 2007 style DP beat tracker.
+ */
+export function trackBeats(audioBuffer: AudioBuffer, tempoHint?: number): BeatTrackResult {
+  const sampleRate = audioBuffer.sampleRate;
+  const channelData = audioBuffer.getChannelData(0);
+
+  const hopSize = 512;
+  const frameSize = 1024;
+  const numFrames = Math.floor((channelData.length - frameSize) / hopSize);
+
+  if (numFrames < 4) {
+    return { beats: [], downbeat: 0, bpm: tempoHint ?? 120 };
+  }
+
+  // --- Onset strength function (same as detectBPM) ---
+  const energies: number[] = [];
+  for (let i = 0; i < numFrames; i++) {
+    const start = i * hopSize;
+    let sum = 0;
+    for (let j = 0; j < frameSize; j++) {
+      const sample = channelData[start + j] ?? 0;
+      sum += sample * sample;
+    }
+    energies.push(Math.sqrt(sum / frameSize));
+  }
+
+  const onset: number[] = [0];
+  for (let i = 1; i < energies.length; i++) {
+    const diff = energies[i] - energies[i - 1];
+    onset.push(diff > 0 ? diff : 0);
+  }
+
+  // Normalize onset to [0, 1]
+  const maxOnset = Math.max(...onset);
+  if (maxOnset > 0) {
+    for (let i = 0; i < onset.length; i++) onset[i] /= maxOnset;
+  }
+
+  // --- DP beat tracking ---
+  const bpm = tempoHint ?? detectBPM(audioBuffer).bpm;
+  const framesPerSecond = sampleRate / hopSize;
+  const beatPeriod = Math.round((framesPerSecond * 60) / bpm);
+
+  if (beatPeriod < 2) {
+    return { beats: [], downbeat: 0, bpm };
+  }
+
+  // Transition penalty weight: how much we penalise deviating from the ideal period
+  const lambda = 100;
+
+  // DP score and backpointer arrays
+  const score = new Float64Array(onset.length);
+  const backPtr = new Int32Array(onset.length).fill(-1);
+
+  // Allowed deviation from ideal beat period: ±20%
+  const minStep = Math.max(1, Math.round(beatPeriod * 0.8));
+  const maxStep = Math.round(beatPeriod * 1.2);
+
+  // Initialize: first potential beats just get onset strength
+  for (let i = 0; i < Math.min(onset.length, maxStep); i++) {
+    score[i] = onset[i];
+  }
+
+  // Fill DP table
+  for (let i = minStep; i < onset.length; i++) {
+    let bestPrev = -Infinity;
+    let bestJ = -1;
+    const searchStart = Math.max(0, i - maxStep);
+    const searchEnd = i - minStep;
+
+    for (let j = searchStart; j <= searchEnd; j++) {
+      // Penalty: squared log-deviation from ideal period
+      const step = i - j;
+      const deviation = Math.log2(step / beatPeriod);
+      const penalty = lambda * deviation * deviation;
+      const candidate = score[j] - penalty;
+
+      if (candidate > bestPrev) {
+        bestPrev = candidate;
+        bestJ = j;
+      }
+    }
+
+    if (bestJ >= 0) {
+      const dpScore = bestPrev + onset[i];
+      if (dpScore > score[i]) {
+        score[i] = dpScore;
+        backPtr[i] = bestJ;
+      }
+    }
+  }
+
+  // --- Backtrace from the best-scoring endpoint ---
+  let bestEnd = 0;
+  let bestEndScore = -Infinity;
+  // Look in the last 2 beat periods for the endpoint
+  const endSearchStart = Math.max(0, onset.length - beatPeriod * 2);
+  for (let i = endSearchStart; i < onset.length; i++) {
+    if (score[i] > bestEndScore) {
+      bestEndScore = score[i];
+      bestEnd = i;
+    }
+  }
+
+  const beatFrames: number[] = [];
+  let current = bestEnd;
+  while (current >= 0) {
+    beatFrames.push(current);
+    current = backPtr[current];
+  }
+  beatFrames.reverse();
+
+  // Convert frame indices to seconds
+  const beats = beatFrames.map((f) => Math.round((f * hopSize / sampleRate) * 1000) / 1000);
+
+  // --- Downbeat detection ---
+  // Accumulate onset energy at each candidate phase within a 4-beat window.
+  // The phase with highest total energy is likely the downbeat.
+  const beatsPerBar = 4;
+  let bestPhase = 0;
+  let bestPhaseEnergy = -Infinity;
+
+  for (let phase = 0; phase < Math.min(beatsPerBar, beats.length); phase++) {
+    let energy = 0;
+    for (let b = phase; b < beatFrames.length; b += beatsPerBar) {
+      energy += onset[beatFrames[b]] ?? 0;
+    }
+    if (energy > bestPhaseEnergy) {
+      bestPhaseEnergy = energy;
+      bestPhase = phase;
+    }
+  }
+
+  const downbeat = beats[bestPhase] ?? beats[0] ?? 0;
+
+  return { beats, downbeat, bpm };
+}

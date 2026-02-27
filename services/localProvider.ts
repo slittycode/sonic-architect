@@ -13,6 +13,7 @@ import {
   ArrangementSection,
 } from '../types';
 import { decodeAudioFile, extractAudioFeatures } from './audioAnalysis';
+import { trackBeats } from './bpmDetection';
 import {
   getInstrumentRecommendations,
   getFXRecommendations,
@@ -21,6 +22,8 @@ import {
 import { generateVitalPatch, generateOperatorPatch } from './patchSmith';
 import { generateMixReport } from './mixDoctor';
 import { detectChords, ChordProgressionResult } from './chordDetection';
+import { classifyGenre } from './genreClassifier';
+import { separateHarmonicPercussive, wrapAsAudioBuffer } from './hpss';
 
 /**
  * Segment the RMS energy profile into arrangement sections.
@@ -230,7 +233,8 @@ export function buildLocalBlueprint(
     vital: generateVitalPatch(features),
     operator: generateOperatorPatch(features),
   };
-  const mixReport = generateMixReport(features); // Use default EDM profile
+  const genreResult = classifyGenre(features);
+  const mixReport = generateMixReport(features, genreResult.genre);
 
   return {
     telemetry: {
@@ -239,6 +243,7 @@ export function buildLocalBlueprint(
       groove: describeGroove(features),
       bpmConfidence: features.bpmConfidence,
       keyConfidence: features.key.confidence,
+      detectedGenre: genreResult.genre,
     },
     arrangement,
     instrumentation,
@@ -255,6 +260,7 @@ export function buildLocalBlueprint(
     secretSauce,
     patches,
     mixReport,
+    mfcc: features.mfcc,
     ...(chordResult && chordResult.chords.length > 0
       ? {
           chordProgression: chordResult.chords,
@@ -292,15 +298,32 @@ export class LocalAnalysisProvider implements AnalysisProvider {
   ): Promise<ReconstructionBlueprint> {
     const startTime = performance.now();
 
-    // Extract features
+    // Extract features from the full mix (spectral bands, loudness, stereo)
     const features = extractAudioFeatures(audioBuffer);
     signal?.throwIfAborted();
 
-    // Chord detection — runs on the same AudioBuffer
-    const chordResult = detectChords(audioBuffer);
+    // HPSS: separate harmonic content for more accurate chord detection.
+    // Key detection already uses Goertzel (frequency-domain), so it's less
+    // affected by drums, but chords benefit significantly from HPSS.
+    const hpss = separateHarmonicPercussive(audioBuffer);
+    const harmonicBuffer = wrapAsAudioBuffer(hpss.harmonic, hpss.sampleRate);
+    signal?.throwIfAborted();
+
+    // Chord detection on harmonic-only audio — removes drum interference
+    const chordResult = detectChords(harmonicBuffer);
+    signal?.throwIfAborted();
+
+    // DP beat tracking — individual beat positions + downbeat for warp markers
+    const beatResult = trackBeats(audioBuffer, features.bpm);
     signal?.throwIfAborted();
 
     const analysisTime = Math.round(performance.now() - startTime);
-    return buildLocalBlueprint(features, analysisTime, 'local', chordResult);
+    const blueprint = buildLocalBlueprint(features, analysisTime, 'local', chordResult);
+
+    // Inject beat positions into telemetry (not part of AudioFeatures)
+    blueprint.telemetry.beatPositions = beatResult.beats;
+    blueprint.telemetry.downbeatPosition = beatResult.downbeat;
+
+    return blueprint;
   }
 }

@@ -22,11 +22,14 @@ import {
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
 import SessionMusician from './components/SessionMusician';
+import AbletonSetDisplay from './components/AbletonSetDisplay';
 import ChatPanel from './components/ChatPanel';
 import { LocalAnalysisProvider } from './services/localProvider';
 import { OllamaProvider } from './services/ollamaProvider';
 import { decodeAudioFile, extractWaveformPeaks } from './services/audioAnalysis';
 import { detectPitches } from './services/pitchDetection';
+import { detectPolyphonic } from './services/polyphonicPitch';
+import { parseAbletonSet, isAbletonFile, type AbletonSetInfo } from './services/abletonParser';
 import { downloadJson, downloadMarkdown } from './services/exportBlueprint';
 
 const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisualizer'));
@@ -89,6 +92,8 @@ const App: React.FC = () => {
   const [midiResult, setMidiResult] = useState<PitchDetectionResult | null>(null);
   const [midiDetecting, setMidiDetecting] = useState(false);
   const [midiError, setMidiError] = useState<string | null>(null);
+  const [polyMode, setPolyMode] = useState(false);
+  const [alsInfo, setAlsInfo] = useState<AbletonSetInfo | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,13 +174,29 @@ const App: React.FC = () => {
       return;
     }
 
+    // Handle Ableton .als files separately
+    if (isAbletonFile(file)) {
+      setAlsInfo(null);
+      try {
+        const parsed = await parseAbletonSet(file);
+        setAlsInfo(parsed);
+        setFileName(file.name);
+        setStatus(AnalysisStatus.COMPLETED);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to parse .als file.');
+      }
+      return;
+    }
+
     const isAudioType = file.type.startsWith('audio/');
     const isAudioExtension = /\.(mp3|wav|ogg|aac|m4a|flac)$/i.test(file.name);
 
     if (!isAudioType && !isAudioExtension) {
-      setError('Invalid file type. Please upload an audio file.');
+      setError('Invalid file type. Please upload an audio file (.mp3, .wav, etc.) or Ableton .als file.');
       return;
     }
+
+    setAlsInfo(null);
 
     if (file.size > LARGE_FILE_THRESHOLD) {
       console.info('Large file detected — analysis may take longer.');
@@ -253,7 +274,9 @@ const App: React.FC = () => {
         // Use BPM from blueprint if available, otherwise default
         const bpResult = await blueprintPromise;
         const bpm = bpResult?.telemetry?.bpm ? parseFloat(bpResult.telemetry.bpm) || 120 : 120;
-        const pitchResult = await detectPitches(decodedBuffer, bpm);
+        const pitchResult = polyMode
+          ? await detectPolyphonic(decodedBuffer, bpm)
+          : await detectPitches(decodedBuffer, bpm);
         setMidiResult(pitchResult);
       } catch (err: unknown) {
         console.error('Pitch detection error:', err);
@@ -281,6 +304,7 @@ const App: React.FC = () => {
     setMidiResult(null);
     setMidiDetecting(false);
     setMidiError(null);
+    setAlsInfo(null);
     abortRef.current?.abort();
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -445,7 +469,7 @@ const App: React.FC = () => {
               type="file"
               ref={fileInputRef}
               className="hidden"
-              accept="audio/*"
+              accept="audio/*,.als"
               onChange={handleFileUpload}
             />
           </div>
@@ -664,13 +688,18 @@ const App: React.FC = () => {
             detecting={midiDetecting}
             error={midiError}
             fileName={fileName}
+            polyMode={polyMode}
+            onPolyModeChange={setPolyMode}
           />
         )}
+
+        {/* Ableton Set Display — renders when .als file is parsed */}
+        {alsInfo && <AbletonSetDisplay setInfo={alsInfo} />}
 
         {/* Chat Panel — renders when toggled */}
         {showChat && <ChatPanel blueprint={blueprint} providerType={providerType} />}
 
-        {!blueprint && status === AnalysisStatus.IDLE && (
+        {!blueprint && !alsInfo && status === AnalysisStatus.IDLE && (
           <div className="flex flex-col items-center justify-center py-24 text-center space-y-6">
             <div className="w-20 h-20 bg-zinc-900 border border-zinc-800 rounded-2xl flex items-center justify-center shadow-xl">
               <Upload className="w-8 h-8 text-zinc-600" aria-hidden="true" />

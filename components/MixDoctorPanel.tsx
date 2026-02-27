@@ -1,11 +1,67 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { Activity, Stethoscope, ChevronRight, CheckCircle2, TrendingDown } from 'lucide-react';
+import {
+  Activity,
+  Stethoscope,
+  ChevronRight,
+  CheckCircle2,
+  TrendingDown,
+  Volume2,
+  Radio,
+  AlertTriangle,
+} from 'lucide-react';
 import { MixDoctorReport } from '../types';
 
 interface MixDoctorPanelProps {
   report: MixDoctorReport;
 }
+
+// --- Reusable sub-components ---
+
+const DiagnosticCard: React.FC<{
+  accentColor: string;
+  label: string;
+  value?: string;
+  children: React.ReactNode;
+}> = ({ accentColor, label, value, children }) => (
+  <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg relative overflow-hidden">
+    <div className={`absolute top-0 left-0 w-1 h-full ${accentColor}`}></div>
+    <p className="text-xs font-bold text-zinc-300 mb-1 flex justify-between">
+      <span>{label}</span>
+      {value && <span className="font-mono text-[10px] text-zinc-500">{value}</span>}
+    </p>
+    <p className="text-xs text-zinc-500 leading-relaxed">{children}</p>
+  </div>
+);
+
+const MeterBar: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
+  colorFn: (v: number) => string;
+}> = ({ label, value, min, max, unit, colorFn }) => {
+  const range = max - min;
+  const pct = Math.max(0, Math.min(100, ((value - min) / range) * 100));
+
+  return (
+    <div>
+      <div className="flex justify-between mb-1">
+        <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold">{label}</span>
+        <span className={`text-xs font-mono font-bold ${colorFn(value)}`}>
+          {value} {unit}
+        </span>
+      </div>
+      <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${colorFn(value).replace('text-', 'bg-')}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -13,7 +69,6 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
   useEffect(() => {
     if (!chartRef.current || !report) return;
 
-    // Clear old chart
     d3.select(chartRef.current).selectAll('*').remove();
 
     const margin = { top: 20, right: 20, bottom: 40, left: 40 };
@@ -29,13 +84,11 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Prepare data
-    // We want to overlay the actual dB and the optimal dB target
     const data = report.advice.map((adv) => {
       const target = report.targetProfile.spectralTargets[adv.band];
       return {
         band: adv.band,
-        actualDb: adv.diffDb + target.optimalDb, // derived from diff = actual - optimal
+        actualDb: adv.diffDb + target.optimalDb,
         optimalDb: target.optimalDb,
         minDb: target.minDb,
         maxDb: target.maxDb,
@@ -43,7 +96,6 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       };
     });
 
-    // X axis setting
     const x = d3
       .scaleBand()
       .domain(data.map((d) => d.band))
@@ -61,8 +113,6 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       .style('fill', '#a1a1aa')
       .style('font-family', 'ui-monospace, monospace');
 
-    // Y axis setting
-    // The range of dB is typically -60 to 0
     const minDbVal = d3.min(data, (d) => Math.min(d.actualDb, d.minDb)) || -60;
     const maxDbVal = d3.max(data, (d) => Math.max(d.actualDb, d.maxDb)) || 0;
 
@@ -84,11 +134,10 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       .style('fill', '#a1a1aa')
       .style('font-family', 'ui-monospace, monospace');
 
-    // Remove domain lines for cleaner look
     svg.selectAll('.domain').remove();
     svg.selectAll('.tick line').attr('stroke', '#3f3f46').attr('stroke-dasharray', '2,2');
 
-    // Draw Target Ranges (Rectangles)
+    // Target range rectangles
     svg
       .selectAll('.targetRange')
       .data(data)
@@ -103,7 +152,7 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       .attr('opacity', 0.15)
       .attr('rx', 2);
 
-    // Draw Target Optimal (Line)
+    // Target optimal line
     svg
       .selectAll('.targetLine')
       .data(data)
@@ -119,7 +168,7 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       .attr('opacity', 0.8)
       .attr('stroke-dasharray', '4,2');
 
-    // Draw Actual Rects
+    // Actual bars
     svg
       .selectAll('.actualBar')
       .data(data)
@@ -127,17 +176,20 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       .append('rect')
       .attr('class', 'actualBar')
       .attr('x', (d) => x(d.band)! + x.bandwidth() * 0.2)
-      .attr('y', (d) => y(Math.max(d.actualDb, -100))) // handle floor
+      .attr('y', (d) => y(Math.max(d.actualDb, -100)))
       .attr('width', x.bandwidth() * 0.6)
       .attr('height', (d) => height - y(Math.max(d.actualDb, -100)))
       .attr('fill', (d) => {
-        if (d.issue === 'too-loud') return '#f87171'; // red-400
-        if (d.issue === 'too-quiet') return '#fbbf24'; // amber-400
-        return '#34d399'; // emerald-400
+        if (d.issue === 'too-loud') return '#f87171';
+        if (d.issue === 'too-quiet') return '#fbbf24';
+        return '#34d399';
       })
       .attr('opacity', 0.9)
       .attr('rx', 2);
   }, [report]);
+
+  const lufs = report.loudnessAdvice;
+  const stereo = report.stereoAdvice;
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg mt-8">
@@ -146,6 +198,10 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
         <div className="flex items-center gap-2">
           <Stethoscope className="w-4 h-4 text-rose-400" aria-hidden="true" />
           <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Mix Doctor</h3>
+          {/* Genre badge */}
+          <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-full border border-blue-400/20">
+            {report.genre}
+          </span>
         </div>
         <div className="flex flex-col items-end">
           <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
@@ -194,20 +250,111 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
 
           <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1">
             {/* Dynamics block */}
-            <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-              <p className="text-xs font-bold text-zinc-300 mb-1 flex justify-between">
-                <span>Dynamics (Crest Factor)</span>
-                <span className="font-mono text-[10px] text-zinc-500">
-                  {report.dynamicsAdvice.actualCrest} dB
-                </span>
-              </p>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                {report.dynamicsAdvice.message}
-              </p>
-            </div>
+            <DiagnosticCard
+              accentColor="bg-blue-500"
+              label="Dynamics (Crest Factor)"
+              value={`${report.dynamicsAdvice.actualCrest} dB`}
+            >
+              {report.dynamicsAdvice.message}
+            </DiagnosticCard>
 
-            {/* Spectral blocks */}
+            {/* LUFS block */}
+            {lufs && (
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg relative overflow-hidden">
+                <div
+                  className={`absolute top-0 left-0 w-1 h-full ${
+                    lufs.issue === 'too-loud'
+                      ? 'bg-rose-500'
+                      : lufs.issue === 'too-quiet'
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                  }`}
+                />
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Volume2 className="w-3.5 h-3.5 text-violet-400" />
+                  <span className="text-xs font-bold text-zinc-300">Loudness (LUFS)</span>
+                </div>
+                <div className="space-y-2 mb-2">
+                  <MeterBar
+                    label="Integrated"
+                    value={lufs.actualLufs}
+                    min={-30}
+                    max={0}
+                    unit="LUFS"
+                    colorFn={(v) =>
+                      lufs.issue === 'optimal'
+                        ? 'text-emerald-400'
+                        : lufs.issue === 'too-loud'
+                          ? 'text-rose-400'
+                          : 'text-amber-400'
+                    }
+                  />
+                  <MeterBar
+                    label="True Peak"
+                    value={lufs.truePeak}
+                    min={-20}
+                    max={3}
+                    unit="dBTP"
+                    colorFn={(v) => (v > -1 ? 'text-rose-400' : 'text-emerald-400')}
+                  />
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">{lufs.message}</p>
+              </div>
+            )}
+
+            {/* Stereo field block */}
+            {stereo && (
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-lg relative overflow-hidden">
+                <div
+                  className={`absolute top-0 left-0 w-1 h-full ${
+                    !stereo.monoCompatible
+                      ? 'bg-rose-500'
+                      : stereo.correlation < 0.2
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                  }`}
+                />
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-xs font-bold text-zinc-300">Stereo Field</span>
+                  {!stereo.monoCompatible && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-400/10 px-1.5 py-0.5 rounded">
+                      <AlertTriangle className="w-3 h-3" />
+                      Phase Risk
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800">
+                    <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block">
+                      Correlation
+                    </span>
+                    <span
+                      className={`text-sm font-mono font-bold ${
+                        stereo.correlation < 0
+                          ? 'text-rose-400'
+                          : stereo.correlation < 0.3
+                            ? 'text-amber-400'
+                            : 'text-emerald-400'
+                      }`}
+                    >
+                      {stereo.correlation.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="bg-zinc-950 rounded px-2 py-1.5 border border-zinc-800">
+                    <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold block">
+                      Width
+                    </span>
+                    <span className="text-sm font-mono font-bold text-cyan-400">
+                      {Math.round(stereo.width * 100)}%
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 leading-relaxed">{stereo.message}</p>
+              </div>
+            )}
+
+            {/* Spectral issue blocks */}
             {report.advice
               .filter((a) => a.issue !== 'optimal')
               .map((adv, idx) => (
@@ -238,7 +385,7 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
                 </div>
               ))}
 
-            {report.advice.filter((a) => a.issue !== 'optimal').length === 0 && (
+            {report.advice.filter((a) => a.issue !== 'optimal').length === 0 && !lufs && !stereo && (
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mb-2 opacity-80" />
                 <p className="text-sm font-bold text-emerald-400">Perfect Spectral Balance</p>
