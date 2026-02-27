@@ -108,24 +108,26 @@ function detectKickTransients(
   const beatDurationMs = (60 / bpm) * 1000;
   const minDistanceMs = beatDurationMs / 4; // 16th notes
   const minDistanceSamples = Math.floor((minDistanceMs / 1000) * sampleRate);
+  // Convert to envelope frames so the comparison is in the same units as `i`
+  const minDistanceFrames = Math.ceil(minDistanceSamples / HOP_SIZE);
 
   // Build energy envelope in kick frequency range
   const envelope = buildKickEnvelope(channelData, sampleRate);
 
   // Find peaks in envelope
-  let lastTransientIndex = -minDistanceSamples;
+  let lastTransientIndex = -minDistanceFrames;
 
   for (let i = 2; i < envelope.length - 2; i++) {
     const prev = envelope[i - 1];
     const curr = envelope[i];
     const next = envelope[i + 1];
 
-    // Peak detection with minimum distance
+    // Peak detection with minimum distance (in envelope frame units)
     if (
       curr > prev &&
       curr > next &&
       curr > 0.01 && // Minimum energy threshold
-      i - lastTransientIndex >= minDistanceSamples
+      i - lastTransientIndex >= minDistanceFrames
     ) {
       transients.push({
         sampleIndex: i * HOP_SIZE,

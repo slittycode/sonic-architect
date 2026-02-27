@@ -112,7 +112,7 @@ export function detectSupersaw(
 
   return {
     isSupersaw,
-    confidence: Math.round(confidence * 100) / 100,
+    confidence: Math.min(1, Math.round(confidence * 100) / 100),
     voiceCount: Math.round(avgVoiceCount),
     avgDetuneCents: Math.round(avgDetuneCents * 100),
     spectralComplexity: spectralComplexity ?? 0,

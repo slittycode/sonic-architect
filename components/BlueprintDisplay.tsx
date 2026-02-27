@@ -552,8 +552,10 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
       {/* Mix Doctor Dashboard */}
       {blueprint.mixReport && <MixDoctorPanel report={blueprint.mixReport} />}
 
-      {/* Enhanced Analysis Panel */}
-      <EnhancedAnalysisPanel telemetry={blueprint.telemetry} />
+      {/* Enhanced Analysis Panel — only when local provider has populated analysis data */}
+      {blueprint.telemetry.sidechainAnalysis && (
+        <EnhancedAnalysisPanel telemetry={blueprint.telemetry} />
+      )}
     </>
   );
 };

@@ -233,9 +233,16 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                 value={telemetry.bassAnalysis.decayMs}
                 min={0}
                 max={1000}
-                label={`Decay Time: ${telemetry.bassAnalysis.decayMs}ms`}
+                label="Decay Time"
                 color="bg-green-500"
-                showValue={false}
+                unit="ms"
+              />
+              <MeterBar
+                value={telemetry.bassAnalysis.transientRatio}
+                min={0}
+                max={1}
+                label="Transient Sharpness"
+                color="bg-green-400"
               />
               <p className="text-[10px] text-zinc-500 leading-relaxed">
                 {telemetry.bassAnalysis.type === 'punchy' &&
@@ -269,6 +276,7 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                 color="bg-purple-500"
                 showValue={false}
               />
+
               <p className="text-[10px] text-zinc-500 leading-relaxed">
                 {telemetry.swingAnalysis.grooveType === 'straight' &&
                   'Straight, quantized rhythm. Typical of techno, trance, and most 4-on-floor electronic music.'}
@@ -285,7 +293,12 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
 
         {/* Acid/303 Detection */}
         {telemetry.acidAnalysis && (
-          <AnalysisCard icon={<Zap className="w-4 h-4" />} title="Acid/303 Detection" accent="pink">
+          <AnalysisCard
+            icon={<Zap className="w-4 h-4" />}
+            title="Acid/303 Detection"
+            accent="pink"
+            confidence={telemetry.acidAnalysis.confidence}
+          >
             <div className="space-y-3">
               <StatusBadge
                 active={telemetry.acidAnalysis.isAcid}
@@ -331,9 +344,16 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                 value={telemetry.reverbAnalysis.rt60}
                 min={0}
                 max={3}
-                label={`RT60: ${telemetry.reverbAnalysis.rt60}s`}
+                label="RT60"
                 color="bg-cyan-500"
                 unit="s"
+              />
+              <MeterBar
+                value={telemetry.reverbAnalysis.tailEnergyRatio}
+                min={0}
+                max={1}
+                label="Tail Energy"
+                color="bg-cyan-400"
               />
               <p className="text-[10px] text-zinc-500 leading-relaxed">
                 {telemetry.reverbAnalysis.isWet
@@ -363,6 +383,13 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                 label={`THD: ${(telemetry.kickAnalysis.thd * 100).toFixed(0)}%`}
                 color={telemetry.kickAnalysis.isDistorted ? 'bg-orange-500' : 'bg-green-500'}
                 showValue={false}
+              />
+              <MeterBar
+                value={telemetry.kickAnalysis.harmonicRatio}
+                min={0}
+                max={1}
+                label="Harmonic Content"
+                color="bg-orange-400"
               />
               <p className="text-[10px] text-zinc-500 leading-relaxed">
                 {telemetry.kickAnalysis.isDistorted
@@ -407,7 +434,12 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
 
         {/* Vocal Detection */}
         {telemetry.vocalAnalysis && (
-          <AnalysisCard icon={<Mic2 className="w-4 h-4" />} title="Vocal Detection" accent="rose">
+          <AnalysisCard
+            icon={<Mic2 className="w-4 h-4" />}
+            title="Vocal Detection"
+            accent="rose"
+            confidence={telemetry.vocalAnalysis.confidence}
+          >
             <div className="space-y-3">
               <StatusBadge
                 active={telemetry.vocalAnalysis.hasVocals}
@@ -454,16 +486,22 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-[10px] text-zinc-500 mb-1">Primary Genre</p>
-                <p className="text-sm font-bold text-zinc-200">{telemetry.enhancedGenre || 'N/A'}</p>
+                <p className="text-sm font-bold text-zinc-200 capitalize">
+                  {(telemetry.enhancedGenre || 'N/A').replace(/-/g, ' ')}
+                </p>
               </div>
               <div>
                 <p className="text-[10px] text-zinc-500 mb-1">Genre Family</p>
-                <p className="text-sm font-bold text-zinc-200 capitalize">{telemetry.genreFamily || 'N/A'}</p>
+                <p className="text-sm font-bold text-zinc-200 capitalize">
+                  {(telemetry.genreFamily || 'N/A').replace(/-/g, ' ')}
+                </p>
               </div>
               {telemetry.secondaryGenre && (
                 <div>
                   <p className="text-[10px] text-zinc-500 mb-1">Secondary</p>
-                  <p className="text-sm font-bold text-zinc-200">{telemetry.secondaryGenre}</p>
+                  <p className="text-sm font-bold text-zinc-200 capitalize">
+                    {telemetry.secondaryGenre.replace(/-/g, ' ')}
+                  </p>
                 </div>
               )}
               {telemetry.acidAnalysis?.isAcid && (

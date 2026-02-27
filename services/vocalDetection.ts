@@ -73,7 +73,7 @@ export function detectVocals(
   ) {
     // Apply window and FFT
     for (let i = 0; i < FRAME_SIZE; i++) {
-      real[i] = (channelData[offset + i] ?? 0) * 0.54 * (1 - Math.cos((2 * Math.PI * i) / (FRAME_SIZE - 1)));
+      real[i] = (channelData[offset + i] ?? 0) * (0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (FRAME_SIZE - 1)));
       imag[i] = 0;
     }
     fftInPlace(real, imag);

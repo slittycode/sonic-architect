@@ -333,7 +333,10 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     signal?.throwIfAborted();
 
     // Essentia.js WASM features (lazy-loaded, non-blocking on failure)
-    const essentiaFeatures = await extractEssentiaFeatures(audioBuffer).catch(() => null);
+    const essentiaFeatures = await extractEssentiaFeatures(audioBuffer).catch((err) => {
+      console.warn('[LocalProvider] Essentia.js WASM unavailable — skipping advanced features:', err);
+      return null;
+    });
     if (essentiaFeatures) {
       features.dissonance = essentiaFeatures.dissonance;
       features.hfc = essentiaFeatures.hfc;
@@ -360,7 +363,10 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     // Polyphonic pitch detection for supersaw analysis (lazy, non-blocking)
     const polyphonicNotes = await detectPolyphonic(audioBuffer, features.bpm)
       .then((r) => r.notes)
-      .catch(() => []);
+      .catch((err) => {
+        console.warn('[LocalProvider] Basic Pitch (TF.js) unavailable — supersaw detection disabled:', err);
+        return [];
+      });
     signal?.throwIfAborted();
 
     // Enhanced genre classification with sidechain/bass decay analysis

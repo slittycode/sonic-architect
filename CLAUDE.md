@@ -10,6 +10,8 @@ pnpm build            # Production build to dist/
 pnpm test             # Run all tests (vitest run)
 pnpm run typecheck    # TypeScript check (tsc --noEmit)
 pnpm run lint         # ESLint
+pnpm run format:check # Prettier check
+pnpm run qa:static    # Typecheck + lint + format check
 pnpm run qa:all       # Typecheck + lint + format check + tests
 ```
 
@@ -29,31 +31,53 @@ Sonic Architect is a React SPA that analyzes audio files and generates Ableton L
 
 ### Provider Pattern
 
-All analysis engines implement `AnalysisProvider` from `types.ts`. Four providers exist:
+All analysis engines implement `AnalysisProvider` from `types.ts`. Five providers exist:
 
 - **`services/localProvider.ts`** — Client-side DSP via Web Audio API + Meyda. Always available, no API key. This is the core engine.
 - **`services/geminiService.ts`** — Runs local DSP first, then enriches via Gemini.
 - **`services/claudeProvider.ts`** — Runs local DSP first, then enriches via `api/claude.ts` proxy.
 - **`services/ollamaProvider.ts`** — Runs local DSP first, then enriches via local Ollama.
+- **`services/openaiProvider.ts`** — Runs local DSP first, then enriches via `api/openai.ts` proxy.
 
 **Critical invariant**: Cloud providers only enhance descriptive text. Measured values (BPM, key, spectral bands) from the local DSP are never overwritten by LLM output — only the `bpmCorrectedByGemini` / `keyCorrectedByGemini` flags on `GlobalTelemetry` represent intentional overrides.
 
 ### DSP Pipeline
 
-`services/audioAnalysis.ts` decodes audio and extracts features. Supporting modules:
-- `bpmDetection.ts` — Autocorrelation-based BPM detection
-- `keyDetection.ts` — Krumhansl-Schmuckler key detection
-- `chordDetection.ts` — Chord progression analysis
-- `pitchDetection.ts` — YIN-based pitch detection (Session Musician / audio→MIDI)
+`services/audioAnalysis.ts` decodes audio and extracts base features. The full pipeline in `localProvider.ts` runs these stages (mostly in parallel):
 
-### Claude API Proxy
+1. `audioAnalysis.ts` — spectral bands, BPM, key, RMS, onsets
+2. `essentiaFeatures.ts` — Essentia.js WASM features (dissonance, HFC, spectral complexity, ZCR)
+3. `hpss.ts` — Harmonic/Percussive Source Separation for cleaner chord analysis
+4. `chordDetection.ts` — Chord progressions on the harmonic-only signal
+5. `bpmDetection.ts` / `keyDetection.ts` — Autocorrelation BPM, Krumhansl-Schmuckler key
+6. `polyphonicPitch.ts` — Basic Pitch WASM for polyphonic note detection (used by supersaw analysis)
+7. `pitchDetection.ts` — YIN-based monophonic pitch (Session Musician / audio→MIDI)
+8. `genreClassifierEnhanced.ts` — Orchestrates 8 specialized detectors via `Promise.all()`:
+   - `sidechainDetection.ts`, `bassAnalysis.ts`, `acidDetection.ts`, `reverbAnalysis.ts`
+   - `kickAnalysis.ts`, `vocalDetection.ts`, `supersawDetection.ts`
+   - Swing detection (in `bassAnalysis.ts`)
 
-`api/claude.ts` is a Vercel Edge Function. In local dev, `vite.config.ts` includes `claudeDevProxy` which loads this same handler via Vite SSR — so `pnpm dev` works without `vercel dev`. `ANTHROPIC_API_KEY` is server-side only.
+All specialized detector results are typed in `GlobalTelemetry` (`types.ts`) as optional sub-objects (e.g. `sidechainAnalysis`, `kickAnalysis`).
+
+### API Proxies
+
+`api/claude.ts` and `api/openai.ts` are Vercel Edge Functions. In local dev, `vite.config.ts` includes a `claudeDevProxy` plugin that loads the Claude handler via Vite SSR — so `pnpm dev` works without `vercel dev`. `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are server-side only.
 
 ### Data Layer
 
 `data/abletonDevices.ts` — deterministic spectral-to-device mapping (no LLM).
 `data/genreProfiles.ts` — target spectral profiles used by the Mix Doctor feature.
+
+### Feature Services
+
+Beyond the DSP pipeline, these services handle secondary features:
+
+- `chatService.ts` — powers the chat panel for Q&A about the analyzed track
+- `midiExport.ts` / `midiPreview.ts` — MIDI file generation and in-browser preview
+- `patchSmith.ts` — generates Vital/Operator patch download links
+- `exportBlueprint.ts` — JSON/text export of the reconstruction blueprint
+- `quantization.ts` — beat quantization utilities
+- `mixDoctor.ts` — spectral balance comparison against genre reference profiles
 
 ## Key Conventions
 

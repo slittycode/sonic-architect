@@ -635,7 +635,7 @@ export async function classifyGenreEnhanced(
     allScores: scores.map((s) => ({
       genre: s.genre,
       score: Math.round(s.score * 100) / 100,
-      confidence: Math.round(s.score * (1 - (primary.score - s.score)) * 100) / 100,
+      confidence: Math.max(0, Math.min(1, Math.round(s.score * (1 - (primary.score - s.score)) * 100) / 100)),
     })),
     bassAnalysis: bassResult,
     sidechainAnalysis: {
