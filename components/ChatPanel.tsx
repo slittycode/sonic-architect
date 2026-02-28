@@ -49,7 +49,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint, providerType }) => {
 
     if (providerType === 'gemini' || (hasGeminiKey && providerType !== 'claude')) {
       // Lazy-load so geminiService stays in its own chunk (not pulled into main bundle)
-      void import('../services/geminiService').then(({ GeminiChatService }) => {
+      void import('../services/gemini').then(({ GeminiChatService }) => {
         chatServiceRef.current = new GeminiChatService(blueprintGetter);
       });
     } else {

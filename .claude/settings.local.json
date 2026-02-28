@@ -21,7 +21,10 @@
       "Bash(npm info:*)",
       "Bash(cat:*)",
       "Bash(node:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(xargs ls:*)",
+      "WebFetch(domain:arxiv.org)",
+      "Bash(grep -n \"sidechainAnalysis\\\\|bassAnalysis\\\\|swingAnalysis\\\\|acidAnalysis\\\\|reverbAnalysis\\\\|kickAnalysis\\\\|supersawAnalysis\\\\|vocalAnalysis\\\\|essentiaFeatures\" services/*.ts)"
     ]
   }
 }

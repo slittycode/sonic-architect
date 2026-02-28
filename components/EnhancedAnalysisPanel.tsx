@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Gauge,
+  Tag,
 } from 'lucide-react';
 import { GlobalTelemetry } from '../types';
 
@@ -163,7 +164,8 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
     telemetry.reverbAnalysis ||
     telemetry.kickAnalysis ||
     telemetry.supersawAnalysis ||
-    telemetry.vocalAnalysis;
+    telemetry.vocalAnalysis ||
+    telemetry.maestAnalysis;
 
   if (!hasEnhancedData) {
     return (
@@ -468,6 +470,55 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                   No significant vocal content detected. This appears to be an instrumental track.
                 </p>
               )}
+            </div>
+          </AnalysisCard>
+        )}
+
+        {/* Discogs Style Match (MAEST browser ML) */}
+        {telemetry.maestAnalysis && (
+          <AnalysisCard
+            icon={<Tag className="w-4 h-4" />}
+            title="Discogs Style Match"
+            accent="purple"
+            confidence={telemetry.maestAnalysis.topScore}
+          >
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] text-zinc-500 mb-0.5">Style Family</p>
+                <p className="text-sm font-bold text-zinc-200">{telemetry.maestAnalysis.primaryFamily}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-500 mb-0.5">Subgenre</p>
+                <p className="text-xs font-semibold text-purple-300">
+                  {telemetry.maestAnalysis.primarySubgenre}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {telemetry.maestAnalysis.topLabels.slice(0, 5).map(({ label, score }) => {
+                  const parts = label.split('---');
+                  const shortLabel = parts[parts.length - 1]?.trim() ?? label;
+                  return (
+                    <div key={label} className="flex items-center gap-2">
+                      <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-purple-500 rounded-full"
+                          style={{ width: `${Math.round(score * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-zinc-400 w-24 truncate text-right">
+                        {shortLabel}
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500 w-8 text-right">
+                        {Math.round(score * 100)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-zinc-500 leading-relaxed">
+                Browser ML classification using Discogs MAEST model trained on 400+ music styles.
+                Results are probabilistic and complement DSP analysis.
+              </p>
             </div>
           </AnalysisCard>
         )}

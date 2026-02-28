@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGeminiEnhancement, mergeGeminiEnhancement } from '../../services/geminiService';
+import { parseGeminiEnhancement, mergeGeminiEnhancement } from '../../services/gemini';
 import type { ReconstructionBlueprint } from '../../types';
 
 const baseBlueprint: ReconstructionBlueprint = {

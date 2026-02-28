@@ -1,77 +1,75 @@
 # Playwright CLI Workflows
 
-Use the wrapper script and snapshot often.
-Assume `PWCLI` is set and `pwcli` is an alias for `"$PWCLI"`.
-In this repo, run commands from `output/playwright/<label>/` to keep artifacts contained.
+Snapshot often. Assume `PWCLI` is set to the wrapper script path.
 
 ## Standard interaction loop
 
 ```bash
-pwcli open https://example.com
-pwcli snapshot
-pwcli click e3
-pwcli snapshot
+"$PWCLI" open https://example.com
+"$PWCLI" snapshot
+"$PWCLI" click e3
+"$PWCLI" snapshot
 ```
 
 ## Form submission
 
 ```bash
-pwcli open https://example.com/form --headed
-pwcli snapshot
-pwcli fill e1 "user@example.com"
-pwcli fill e2 "password123"
-pwcli click e3
-pwcli snapshot
-pwcli screenshot
+"$PWCLI" open https://example.com/form --headed
+"$PWCLI" snapshot
+"$PWCLI" fill e1 "user@example.com"
+"$PWCLI" fill e2 "password123"
+"$PWCLI" click e3
+"$PWCLI" snapshot
+"$PWCLI" screenshot
 ```
 
 ## Data extraction
 
 ```bash
-pwcli open https://example.com
-pwcli snapshot
-pwcli eval "document.title"
-pwcli eval "el => el.textContent" e12
+"$PWCLI" open https://example.com
+"$PWCLI" snapshot
+"$PWCLI" eval "document.title"
+"$PWCLI" eval "el => el.textContent" e12
 ```
 
 ## Debugging and inspection
 
-Capture console messages and network activity after reproducing an issue:
+Capture console messages and network activity:
 
 ```bash
-pwcli console warning
-pwcli network
+"$PWCLI" console warning
+"$PWCLI" network
 ```
 
 Record a trace around a suspicious flow:
 
 ```bash
-pwcli tracing-start
+"$PWCLI" tracing-start
 # reproduce the issue
-pwcli tracing-stop
-pwcli screenshot
+"$PWCLI" tracing-stop
+"$PWCLI" screenshot
 ```
 
 ## Sessions
 
-Use sessions to isolate work across projects:
+Isolate work across different contexts:
 
 ```bash
-pwcli --session marketing open https://example.com
-pwcli --session marketing snapshot
-pwcli --session checkout open https://example.com/checkout
+"$PWCLI" --session marketing open https://example.com
+"$PWCLI" --session marketing snapshot
+"$PWCLI" --session checkout open https://example.com/checkout
 ```
 
 Or set the session once:
 
 ```bash
 export PLAYWRIGHT_CLI_SESSION=checkout
-pwcli open https://example.com/checkout
+"$PWCLI" open https://example.com/checkout
 ```
 
 ## Configuration file
 
-By default, the CLI reads `playwright-cli.json` from the current directory. Use `--config` to point at a specific file.
+The CLI reads `playwright-cli.json` from the current directory by default. Use `--config` to point at a specific file.
 
 Minimal example:
 
@@ -88,8 +86,68 @@ Minimal example:
 }
 ```
 
+## Sonic Architect — Smoke checks
+
+These workflows verify the Sonic Architect dev server. Start with `pnpm dev` first.
+
+### Verify app loads
+
+```bash
+"$PWCLI" open http://localhost:3000
+"$PWCLI" snapshot
+"$PWCLI" eval "document.querySelector('h1')?.textContent"
+# Expected: "Sonic Architect"
+"$PWCLI" screenshot
+```
+
+### Verify keyboard shortcuts
+
+The play button should have `aria-keyshortcuts="Space"`:
+
+```bash
+"$PWCLI" open http://localhost:3000
+"$PWCLI" snapshot
+"$PWCLI" eval "document.querySelector('[aria-keyshortcuts]')?.getAttribute('aria-keyshortcuts')"
+# Expected: "Space"
+"$PWCLI" eval "document.querySelector('[aria-keyshortcuts]')?.title"
+# Expected: contains "Space"
+```
+
+### Verify section structure
+
+```bash
+"$PWCLI" open http://localhost:3000
+"$PWCLI" snapshot
+"$PWCLI" eval "Array.from(document.querySelectorAll('section')).map(s => s.getAttribute('aria-label')).filter(Boolean)"
+```
+
+### Test file upload flow
+
+```bash
+"$PWCLI" open http://localhost:3000 --headed
+"$PWCLI" snapshot
+"$PWCLI" upload ./path/to/test-audio.wav
+"$PWCLI" snapshot
+# Wait for analysis, then check results
+"$PWCLI" eval "document.querySelector('[data-testid=\"bpm\"]')?.textContent"
+"$PWCLI" screenshot
+```
+
+### Visual regression
+
+Take a baseline screenshot, then compare after changes:
+
+```bash
+mkdir -p output/playwright/baselines
+"$PWCLI" open http://localhost:3000
+"$PWCLI" screenshot    # save as baseline
+# After code changes, repeat and compare
+```
+
 ## Troubleshooting
 
-- If an element ref fails, run `pwcli snapshot` again and retry.
-- If the page looks wrong, re-open with `--headed` and resize the window.
-- If a flow depends on prior state, use a named `--session`.
+1. **Stale ref** — Run `"$PWCLI" snapshot` again and retry with the new ref.
+2. **Page looks wrong** — Re-open with `--headed` and resize: `"$PWCLI" resize 1280 720`.
+3. **State-dependent flow** — Use a named `--session` to preserve cookies and storage.
+4. **Dev server not running** — Start `pnpm dev` in a separate terminal first.
+5. **npx not found** — Install Node.js (which includes npm/npx).

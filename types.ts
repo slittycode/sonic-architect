@@ -2,6 +2,15 @@ export interface GlobalTelemetry {
   bpm: string;
   key: string;
   groove: string;
+  /** Full structured Gemini audio analysis from Phase 1. */
+  geminiAudioAnalysis?: import('./services/gemini/types/analysis').AudioAnalysisResult;
+  /** Discogs MAEST browser ML classification result. */
+  maestAnalysis?: {
+    topLabels: Array<{ label: string; score: number }>;
+    primaryFamily: string;
+    primarySubgenre: string;
+    topScore: number;
+  };
   bpmConfidence?: number;
   keyConfidence?: number;
   /** Gemini cross-verification notes — present when Gemini provider is used. */

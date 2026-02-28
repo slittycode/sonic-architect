@@ -16,7 +16,7 @@ vi.mock('../../services/chatService', () => ({
   },
 }));
 
-vi.mock('../../services/geminiService', () => ({
+vi.mock('../../services/gemini', () => ({
   GeminiChatService: class GeminiChatServiceMock {
     sendMessage = sendMessageMock;
     clearHistory = clearHistoryMock;

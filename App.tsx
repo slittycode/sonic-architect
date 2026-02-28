@@ -19,8 +19,8 @@ import {
   ReconstructionBlueprint,
   PitchDetectionResult,
 } from './types';
-import { GEMINI_MODEL_LABELS } from './services/geminiService';
-import type { GeminiModelId } from './services/geminiService';
+import { GEMINI_MODEL_LABELS } from './services/gemini';
+import type { GeminiModelId } from './services/gemini';
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
 import SessionMusician from './components/SessionMusician';
@@ -151,7 +151,7 @@ const App: React.FC = () => {
 
     if (providerType === 'gemini') {
       // Lazy load Gemini provider only when selected
-      const { GeminiProvider } = await import('./services/geminiService');
+      const { GeminiProvider } = await import('./services/gemini');
       const gemini = new GeminiProvider(geminiModel);
       if (await gemini.isAvailable()) return gemini;
       // Fallback to local if Gemini API key is missing

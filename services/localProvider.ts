@@ -392,6 +392,18 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     blueprint.telemetry.beatPositions = beatResult.beats;
     blueprint.telemetry.downbeatPosition = beatResult.downbeat;
 
+    // MAEST browser ML genre classification (optional, non-blocking)
+    // Runs with a 45-second ceiling via Promise.race inside classifyDiscogsMaest.
+    const maestResult = await import('./discogsMaest')
+      .then(({ classifyDiscogsMaest }) => classifyDiscogsMaest(audioBuffer))
+      .catch((err) => {
+        console.warn('[LocalProvider] MAEST classification unavailable:', err);
+        return null;
+      });
+    if (maestResult) {
+      blueprint.telemetry.maestAnalysis = maestResult;
+    }
+
     return blueprint;
   }
 }
