@@ -438,9 +438,9 @@ const App: React.FC = () => {
                         // Group Gemini models by their 'group' field for meaningful UI
                         type GroupName = string;
                         const grouped: Record<GroupName, GeminiModelId[]> = {};
-                        Object.entries(GEMINI_MODELS).forEach(([id, meta]) => {
-                          if (!grouped[meta.group]) grouped[meta.group] = [];
-                          grouped[meta.group].push(id as GeminiModelId);
+                        GEMINI_MODELS.forEach((model) => {
+                          if (!grouped[model.group]) grouped[model.group] = [];
+                          grouped[model.group].push(model.id);
                         });
                         // Define display order for groups
                         const groupOrder = ['stable', 'preview', 'experimental'];
