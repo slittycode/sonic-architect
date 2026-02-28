@@ -25,7 +25,19 @@
       "Bash(xargs ls:*)",
       "WebFetch(domain:arxiv.org)",
       "Bash(grep -n \"sidechainAnalysis\\\\|bassAnalysis\\\\|swingAnalysis\\\\|acidAnalysis\\\\|reverbAnalysis\\\\|kickAnalysis\\\\|supersawAnalysis\\\\|vocalAnalysis\\\\|essentiaFeatures\" services/*.ts)",
-      "Bash(do echo:*)"
+      "Bash(do echo:*)",
+      "Bash(lsof:*)",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_file_upload",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm ls:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

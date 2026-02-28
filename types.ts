@@ -151,7 +151,7 @@ export enum AnalysisStatus {
 }
 
 // Provider types
-export type ProviderType = 'local' | 'ollama' | 'gemini' | 'claude' | 'openai';
+export type ProviderType = 'local' | 'ollama' | 'gemini' | 'claude' | 'openai' | 'azure_openai';
 
 export interface AnalysisProvider {
   name: string;

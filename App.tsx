@@ -27,7 +27,7 @@ import SessionMusician from './components/SessionMusician';
 import AbletonSetDisplay from './components/AbletonSetDisplay';
 import ChatPanel from './components/ChatPanel';
 import { LocalAnalysisProvider } from './services/localProvider';
-import { OllamaProvider } from './services/ollamaProvider';
+
 import { decodeAudioFile, extractWaveformPeaks } from './services/audioAnalysis';
 import { detectPitches } from './services/pitchDetection';
 import { detectPolyphonic } from './services/polyphonicPitch';
@@ -38,7 +38,7 @@ const WaveformVisualizer = React.lazy(() => import('./components/WaveformVisuali
 
 // Initialize providers
 const localProvider = new LocalAnalysisProvider();
-const ollamaProvider = new OllamaProvider(localProvider);
+
 
 function getStoredProvider(): ProviderType {
   const hasGeminiKey =
@@ -46,7 +46,7 @@ function getStoredProvider(): ProviderType {
     import.meta.env.VITE_GEMINI_API_KEY.length > 0;
   try {
     const stored = localStorage.getItem('sonic-architect-provider');
-    if (stored === 'gemini' || stored === 'local' || stored === 'ollama' || stored === 'openai')
+    if (stored === 'gemini' || stored === 'local' || stored === 'ollama' || stored === 'openai' || stored === 'azure_openai')
       return stored as ProviderType;
     // If 'claude' was stored from a previous session but no Anthropic key is configured,
     // prefer Gemini (if available) so the app doesn't immediately show an Anthropic error.
@@ -83,6 +83,11 @@ const App: React.FC = () => {
   const [fileName, setFileName] = useState<string | null>(null);
   const [providerType, setProviderType] = useState<ProviderType>(getStoredProvider);
   const [showSettings, setShowSettings] = useState(false);
+  const [ollamaTestStatus, setOllamaTestStatus] = useState<{
+    testing: boolean;
+    ok?: boolean;
+    message?: string;
+  }>({ testing: false });
   const [showChat, setShowChat] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
   const [providerNotice, setProviderNotice] = useState<string | null>(null);
@@ -141,11 +146,27 @@ const App: React.FC = () => {
     setProviderNotice(null);
 
     if (providerType === 'ollama') {
-      if (await ollamaProvider.isAvailable()) return ollamaProvider;
-      setProviderNotice(
-        'Ollama not detected. Using Local DSP Engine. Start Ollama with `ollama serve`.'
-      );
-      return localProvider;
+      const { OllamaProvider } = await import('./services/ollamaProvider');
+      const provider = new OllamaProvider();
+      
+      // Check if Ollama server is running
+      if (!(await provider.isAvailable())) {
+        setProviderNotice(
+          'Ollama not detected. Using Local DSP Engine. Start Ollama with `ollama serve`.'
+        );
+        return localProvider;
+      }
+      
+      // Check if the model is pulled
+      if (!(await provider.checkModelPulled())) {
+        const config = provider.getConfig();
+        setProviderNotice(
+          `Model "${config.model}" not found. Run: ollama pull ${config.model}`
+        );
+        return localProvider;
+      }
+      
+      return provider;
     }
 
     if (providerType === 'gemini') {
@@ -172,6 +193,16 @@ const App: React.FC = () => {
       const openai = new OpenAIAnalysisProvider();
       if (await openai.isAvailable()) return openai;
       setProviderNotice('OpenAI API key not configured. Using Local DSP Engine.');
+      return localProvider;
+    }
+
+    if (providerType === 'azure_openai') {
+      const { AzureOpenAIAnalysisProvider } = await import('./services/azureOpenAIProvider');
+      const azureOpenAI = new AzureOpenAIAnalysisProvider();
+      if (await azureOpenAI.isAvailable()) return azureOpenAI;
+      setProviderNotice(
+        'Azure OpenAI not configured. Using Local DSP Engine. Set endpoint, deployment, and API key.'
+      );
       return localProvider;
     }
 
@@ -369,9 +400,11 @@ const App: React.FC = () => {
         ? 'GPT-4o Audio'
         : providerType === 'claude'
           ? 'Claude'
-          : providerType === 'ollama'
-            ? 'Ollama + Local DSP'
-            : 'Local DSP Engine';
+          : providerType === 'azure_openai'
+            ? 'Azure OpenAI'
+            : providerType === 'ollama'
+              ? 'Ollama + Local DSP'
+              : 'Local DSP Engine';
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center pb-20">
@@ -497,6 +530,126 @@ const App: React.FC = () => {
                       </p>
                     </div>
                   </button>
+                  {providerType === 'ollama' && (
+                    <div className="px-3 py-2 bg-zinc-950 border-y border-zinc-800 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="http://localhost:11434"
+                        defaultValue={(() => {
+                          try {
+                            return localStorage.getItem('sonic_ollama_baseurl') ?? '';
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          try {
+                            if (val) localStorage.setItem('sonic_ollama_baseurl', val);
+                            else localStorage.removeItem('sonic_ollama_baseurl');
+                          } catch {}
+                        }}
+                        className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-violet-600"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Model name (e.g., llama3.2)"
+                        defaultValue={(() => {
+                          try {
+                            return localStorage.getItem('sonic_ollama_model') ?? '';
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          try {
+                            if (val) localStorage.setItem('sonic_ollama_model', val);
+                            else localStorage.removeItem('sonic_ollama_model');
+                          } catch {}
+                        }}
+                        className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-violet-600"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="1"
+                        placeholder="Temperature (0.0 - 1.0)"
+                        defaultValue={(() => {
+                          try {
+                            return localStorage.getItem('sonic_ollama_temp') ?? '';
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          try {
+                            if (val) localStorage.setItem('sonic_ollama_temp', val);
+                            else localStorage.removeItem('sonic_ollama_temp');
+                          } catch {}
+                        }}
+                        className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-violet-600"
+                      />
+                      <button
+                        onClick={async () => {
+                          setOllamaTestStatus({ testing: true });
+                          try {
+                            const { OllamaProvider } = await import('./services/ollamaProvider');
+                            const provider = new OllamaProvider();
+                            
+                            if (!(await provider.isAvailable())) {
+                              setOllamaTestStatus({
+                                testing: false,
+                                ok: false,
+                                message: 'Ollama not running. Start with: ollama serve',
+                              });
+                              return;
+                            }
+                            
+                            if (!(await provider.checkModelPulled())) {
+                              const config = provider.getConfig();
+                              setOllamaTestStatus({
+                                testing: false,
+                                ok: false,
+                                message: `Model "${config.model}" not pulled. Run: ollama pull ${config.model}`,
+                              });
+                              return;
+                            }
+                            
+                            const config = provider.getConfig();
+                            setOllamaTestStatus({
+                              testing: false,
+                              ok: true,
+                              message: `Connected! Model "${config.model}" is ready.`,
+                            });
+                          } catch (err) {
+                            setOllamaTestStatus({
+                              testing: false,
+                              ok: false,
+                              message: err instanceof Error ? err.message : 'Connection failed',
+                            });
+                          }
+                        }}
+                        disabled={ollamaTestStatus.testing}
+                        className="w-full text-[11px] bg-violet-600/20 hover:bg-violet-600/30 disabled:opacity-50 text-violet-300 border border-violet-600/40 rounded px-2 py-1.5 transition-colors"
+                      >
+                        {ollamaTestStatus.testing ? 'Testing...' : 'Test Connection'}
+                      </button>
+                      {ollamaTestStatus.message && (
+                        <div
+                          className={`text-[11px] px-2 py-1 rounded ${
+                            ollamaTestStatus.ok
+                              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                          }`}
+                        >
+                          {ollamaTestStatus.message}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button
                     onClick={() => handleProviderChange('claude')}
                     className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'claude' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
@@ -542,6 +695,82 @@ const App: React.FC = () => {
                           } catch {}
                         }}
                         className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                  )}
+                  <button
+                    onClick={() => handleProviderChange('azure_openai')}
+                    className={`w-full px-3 py-3 flex items-center gap-3 text-left hover:bg-zinc-800/50 transition-colors ${providerType === 'azure_openai' ? 'bg-blue-900/20 border-l-2 border-blue-500' : ''}`}
+                  >
+                    <Cloud
+                      className="w-4 h-4 text-blue-500 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-zinc-200">Azure OpenAI</div>
+                      <div className="text-xs text-zinc-500">
+                        Microsoft Azure · Hybrid local+cloud
+                      </div>
+                    </div>
+                  </button>
+                  {providerType === 'azure_openai' && (
+                    <div className="px-3 py-2 bg-zinc-950 border-y border-zinc-800 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="https://your-resource.openai.azure.com/openai/v1/"
+                        defaultValue={(() => {
+                          try {
+                            return localStorage.getItem('azure_openai_endpoint') ?? '';
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          try {
+                            if (val) localStorage.setItem('azure_openai_endpoint', val);
+                            else localStorage.removeItem('azure_openai_endpoint');
+                          } catch {}
+                        }}
+                        className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-blue-600"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Deployment name (e.g., gpt-4o)"
+                        defaultValue={(() => {
+                          try {
+                            return localStorage.getItem('azure_openai_deployment') ?? '';
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          try {
+                            if (val) localStorage.setItem('azure_openai_deployment', val);
+                            else localStorage.removeItem('azure_openai_deployment');
+                          } catch {}
+                        }}
+                        className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-blue-600"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Azure OpenAI API key"
+                        defaultValue={(() => {
+                          try {
+                            return localStorage.getItem('azure_openai_api_key') ?? '';
+                          } catch {
+                            return '';
+                          }
+                        })()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          try {
+                            if (val) localStorage.setItem('azure_openai_api_key', val);
+                            else localStorage.removeItem('azure_openai_api_key');
+                          } catch {}
+                        }}
+                        className="w-full text-[11px] bg-zinc-900 border border-zinc-700 rounded px-2 py-1.5 text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-blue-600"
                       />
                     </div>
                   )}
@@ -658,9 +887,11 @@ const App: React.FC = () => {
                         ? 'Running Local DSP + GPT-4o Audio Enrichment...'
                         : providerType === 'claude'
                           ? 'Running Local DSP + Claude Enrichment...'
-                          : providerType === 'ollama'
-                            ? 'Analyzing Audio + Preparing Ollama Enhancement...'
-                            : 'Analyzing Audio Spectrogram...'}
+                          : providerType === 'azure_openai'
+                            ? 'Running Local DSP + Azure OpenAI Enrichment...'
+                            : providerType === 'ollama'
+                              ? 'Analyzing Audio + Preparing Ollama Enhancement...'
+                              : 'Analyzing Audio Spectrogram...'}
                   </span>
                   <span className="text-xs text-blue-400/80">
                     {providerType === 'gemini'
@@ -669,9 +900,11 @@ const App: React.FC = () => {
                         ? 'BPM/key from local DSP — GPT-4o listening to audio and enriching descriptions...'
                         : providerType === 'claude'
                           ? 'BPM/key from local DSP — Claude enriching descriptions with Ableton expertise...'
-                          : providerType === 'ollama'
-                            ? 'Running local DSP first, then enriching descriptions with Ollama...'
-                            : 'Extracting BPM, key, spectral features, chords, and onset data...'}
+                          : providerType === 'azure_openai'
+                            ? 'BPM/key from local DSP — Azure OpenAI enriching descriptions...'
+                            : providerType === 'ollama'
+                              ? 'Running local DSP first, then enriching descriptions with Ollama...'
+                              : 'Extracting BPM, key, spectral features, chords, and onset data...'}
                   </span>
                 </div>
               </div>
@@ -827,9 +1060,11 @@ const App: React.FC = () => {
                   ? ` Local DSP measures BPM, key, and spectrum precisely — ${geminiLabel} enriches descriptions and Ableton device recommendations.`
                   : providerType === 'claude'
                     ? ' Local DSP measures BPM, key, and spectrum precisely — Claude enriches descriptions with Ableton expertise.'
-                    : providerType === 'ollama'
-                      ? ' Core analysis runs locally; Ollama enhances the descriptive output when available.'
-                      : ' Analysis runs entirely in your browser — no API key needed.'}
+                    : providerType === 'azure_openai'
+                      ? ' Local DSP measures BPM, key, and spectrum precisely — Azure OpenAI enriches descriptions with Ableton expertise.'
+                      : providerType === 'ollama'
+                        ? ' Core analysis runs locally; Ollama enhances the descriptive output when available.'
+                        : ' Analysis runs entirely in your browser — no API key needed.'}
               </p>
             </div>
             <button

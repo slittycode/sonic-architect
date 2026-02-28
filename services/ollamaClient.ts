@@ -18,6 +18,58 @@ export const DEFAULT_OLLAMA_CONFIG: OllamaConfig = {
   temperature: 0.3,
 };
 
+// localStorage keys
+const OLLAMA_BASEURL_KEY = 'sonic_ollama_baseurl';
+const OLLAMA_MODEL_KEY = 'sonic_ollama_model';
+const OLLAMA_TEMP_KEY = 'sonic_ollama_temp';
+
+export function getStoredOllamaConfig(): Partial<OllamaConfig> {
+  try {
+    const baseUrl = localStorage.getItem(OLLAMA_BASEURL_KEY);
+    const model = localStorage.getItem(OLLAMA_MODEL_KEY);
+    const temp = localStorage.getItem(OLLAMA_TEMP_KEY);
+    return {
+      ...(baseUrl && { baseUrl }),
+      ...(model && { model }),
+      ...(temp && { temperature: parseFloat(temp) }),
+    };
+  } catch {
+    return {};
+  }
+}
+
+export function setStoredOllamaBaseUrl(value: string): void {
+  try {
+    if (value) localStorage.setItem(OLLAMA_BASEURL_KEY, value);
+    else localStorage.removeItem(OLLAMA_BASEURL_KEY);
+  } catch {}
+}
+
+export function setStoredOllamaModel(value: string): void {
+  try {
+    if (value) localStorage.setItem(OLLAMA_MODEL_KEY, value);
+    else localStorage.removeItem(OLLAMA_MODEL_KEY);
+  } catch {}
+}
+
+export function setStoredOllamaTemperature(value: string): void {
+  try {
+    if (value) localStorage.setItem(OLLAMA_TEMP_KEY, value);
+    else localStorage.removeItem(OLLAMA_TEMP_KEY);
+  } catch {}
+}
+
+/**
+ * Check if a specific model is available (pulled) on the Ollama server.
+ */
+export async function isModelPulled(
+  modelName: string,
+  baseUrl: string = DEFAULT_OLLAMA_CONFIG.baseUrl
+): Promise<boolean> {
+  const models = await listOllamaModels(baseUrl);
+  return models.some((m) => m === modelName || m.startsWith(`${modelName}:`));
+}
+
 interface OllamaTagsPayload {
   models?: Array<{ name?: unknown }>;
 }

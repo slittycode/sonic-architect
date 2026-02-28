@@ -3,7 +3,9 @@ import { decodeAudioFile } from './audioAnalysis';
 import { LocalAnalysisProvider } from './localProvider';
 import {
   DEFAULT_OLLAMA_CONFIG,
+  getStoredOllamaConfig,
   isOllamaAvailable,
+  isModelPulled,
   OllamaConfig,
   queryOllama,
 } from './ollamaClient';
@@ -126,14 +128,31 @@ function mergeEnhancement(
 export class OllamaProvider implements AnalysisProvider {
   name = 'Local LLM (Ollama)';
   type = 'ollama' as const;
+  private config: OllamaConfig;
 
   constructor(
     private readonly localProvider: LocalAnalysisProvider = new LocalAnalysisProvider(),
-    private readonly config: OllamaConfig = DEFAULT_OLLAMA_CONFIG
-  ) {}
+    config?: OllamaConfig
+  ) {
+    // Merge stored config with defaults
+    const stored = getStoredOllamaConfig();
+    this.config = {
+      ...DEFAULT_OLLAMA_CONFIG,
+      ...stored,
+      ...config,
+    };
+  }
 
   async isAvailable(): Promise<boolean> {
     return isOllamaAvailable(this.config.baseUrl);
+  }
+
+  async checkModelPulled(): Promise<boolean> {
+    return isModelPulled(this.config.model, this.config.baseUrl);
+  }
+
+  getConfig(): OllamaConfig {
+    return { ...this.config };
   }
 
   async analyze(file: File): Promise<ReconstructionBlueprint> {
