@@ -24,7 +24,8 @@
       "Bash(rm:*)",
       "Bash(xargs ls:*)",
       "WebFetch(domain:arxiv.org)",
-      "Bash(grep -n \"sidechainAnalysis\\\\|bassAnalysis\\\\|swingAnalysis\\\\|acidAnalysis\\\\|reverbAnalysis\\\\|kickAnalysis\\\\|supersawAnalysis\\\\|vocalAnalysis\\\\|essentiaFeatures\" services/*.ts)"
+      "Bash(grep -n \"sidechainAnalysis\\\\|bassAnalysis\\\\|swingAnalysis\\\\|acidAnalysis\\\\|reverbAnalysis\\\\|kickAnalysis\\\\|supersawAnalysis\\\\|vocalAnalysis\\\\|essentiaFeatures\" services/*.ts)",
+      "Bash(do echo:*)"
     ]
   }
 }

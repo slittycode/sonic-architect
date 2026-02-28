@@ -11,7 +11,8 @@
  * Only ONE generateContent call includes inlineData (audio).
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, FileState } from '@google/genai';
+import type { Part } from '@google/genai';
 import { AnalysisProvider, ReconstructionBlueprint, GlobalTelemetry } from '../../types';
 import { decodeAudioFile, extractAudioFeatures } from '../audioAnalysis';
 import { generateMixReport } from '../mixDoctor';
@@ -19,17 +20,93 @@ import { AudioAnalysisResult, validateAudioAnalysisResult } from './types/analys
 import { buildAudioAnalysisPrompt } from './prompts/audioAnalysis';
 import { buildDeviceChainsPrompt } from './prompts/deviceChains';
 
-export type GeminiModelId = 'gemini-2.0-flash' | 'gemini-2.5-flash' | 'gemini-2.5-pro';
+export type GeminiModelId =
+  | 'gemini-2.0-flash'
+  | 'gemini-2.5-flash'
+  | 'gemini-2.5-pro'
+  | 'gemini-3-flash-preview'
+  | 'gemini-3-pro-image-preview'
+  | 'gemini-3.1-flash-image-preview'
+  | 'gemini-3.1-pro-preview';
 
-export const GEMINI_MODEL_LABELS: Record<GeminiModelId, string> = {
-  'gemini-2.0-flash': 'Gemini 2.0 Flash',
-  'gemini-2.5-flash': 'Gemini 2.5 Flash',
-  'gemini-2.5-pro': 'Gemini 2.5 Pro',
-};
+export type GeminiModelGroup = 'experimental' | 'stable' | 'preview';
+
+export const GEMINI_MODELS: { id: GeminiModelId; label: string; group: GeminiModelGroup }[] = [
+  // Latest/Experimental
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', group: 'experimental' },
+  // Stable Flash
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', group: 'stable' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', group: 'stable' },
+  // Legacy/Preview
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Preview)', group: 'preview' },
+  { id: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro Image (Preview)', group: 'preview' },
+  { id: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash Image (Preview)', group: 'preview' },
+  { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Preview)', group: 'preview' },
+];
+
+export const GEMINI_MODEL_LABELS: Record<GeminiModelId, string> = Object.fromEntries(
+  GEMINI_MODELS.map((m) => [m.id, m.label])
+) as Record<GeminiModelId, string>;
 
 const DEFAULT_MODEL: GeminiModelId = 'gemini-2.5-flash';
-/** Gemini inline audio upload hard cap (20 MB). Files above this skip cloud enrichment. */
-const GEMINI_INLINE_LIMIT = 20 * 1024 * 1024;
+/** Files larger than this use the Files API upload instead of base64 inline encoding. */
+const FILES_API_THRESHOLD = 20 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// File reading helpers
+// ---------------------------------------------------------------------------
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = () => reject(new Error('Failed to read audio file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Build the audio Part for Gemini's generateContent call.
+ * Small files (≤ FILES_API_THRESHOLD) are sent inline as base64.
+ * Large files are uploaded via the Files API, polled until ACTIVE, and
+ * referenced by URI. Returns the uploaded file name for post-analysis cleanup.
+ */
+async function buildAudioPart(
+  ai: GoogleGenAI,
+  file: File,
+): Promise<{ part: Part; uploadedFileName: string | null }> {
+  if (file.size <= FILES_API_THRESHOLD) {
+    const base64 = await readFileAsBase64(file);
+    return {
+      part: { inlineData: { data: base64, mimeType: file.type } },
+      uploadedFileName: null,
+    };
+  }
+
+  // Large file — upload via Files API
+  const uploaded = await ai.files.upload({ file, config: { mimeType: file.type } });
+  if (!uploaded.uri || !uploaded.name) {
+    throw new Error('Gemini file upload returned no URI or name');
+  }
+
+  // Poll until server-side processing completes
+  let fileInfo = uploaded;
+  while (fileInfo.state === FileState.PROCESSING) {
+    await new Promise((r) => setTimeout(r, 2000));
+    fileInfo = await ai.files.get({ name: uploaded.name });
+  }
+  if (fileInfo.state === FileState.FAILED) {
+    throw new Error('Gemini file processing failed');
+  }
+  if (!fileInfo.uri) {
+    throw new Error('Gemini file processing returned no URI');
+  }
+
+  return {
+    part: { fileData: { fileUri: fileInfo.uri, mimeType: file.type } },
+    uploadedFileName: uploaded.name,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Enhancement merge helpers (reused from original geminiService)
@@ -362,15 +439,23 @@ export class GeminiProvider implements AnalysisProvider {
     const localProvider = new LocalAnalysisProvider();
     const localBlueprint = await localProvider.analyzeAudioBuffer(audioBuffer);
 
-    // Step 2 — Enforce 20 MB inline limit (Gemini API hard cap)
-    if (file.size > GEMINI_INLINE_LIMIT) {
-      const mb = (file.size / 1024 / 1024).toFixed(1);
+    // Step 2 — Prepare audio for Gemini (inline base64 or Files API upload)
+    const ai = new GoogleGenAI({ apiKey });
+    let uploadedFileName: string | null = null;
+    let audioPart: Part;
+    try {
+      const result = await buildAudioPart(ai, file);
+      audioPart = result.part;
+      uploadedFileName = result.uploadedFileName;
+    } catch (err) {
+      console.warn('[GeminiProvider] Audio upload failed, falling back to local-only:', err);
       const analysisTime = Math.round(performance.now() - startTime);
       return {
         ...localBlueprint,
         telemetry: {
           ...localBlueprint.telemetry,
-          verificationNotes: `File is ${mb}MB — exceeds Gemini 20MB inline limit. Local DSP measurements used without cloud enrichment.`,
+          verificationNotes:
+            'Gemini audio upload failed — local DSP measurements used without cloud enrichment.',
         },
         meta: {
           provider: 'gemini',
@@ -382,16 +467,6 @@ export class GeminiProvider implements AnalysisProvider {
       };
     }
 
-    // Step 3 — Read file as base64 for Gemini audio input
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve((reader.result as string).split(',')[1]);
-      reader.onerror = () => reject(new Error('Failed to read audio file.'));
-      reader.readAsDataURL(file);
-    });
-
-    const ai = new GoogleGenAI({ apiKey });
-    const audioPart = { inlineData: { data: base64, mimeType: file.type } };
     const modelPath = `models/${this.modelId}`;
 
     // -----------------------------------------------------------------------
@@ -469,6 +544,13 @@ export class GeminiProvider implements AnalysisProvider {
     }
 
     const analysisTime = Math.round(performance.now() - startTime);
+
+    // Clean up uploaded file (fire-and-forget)
+    if (uploadedFileName) {
+      ai.files.delete({ name: uploadedFileName }).catch((err) => {
+        console.warn('[GeminiProvider] Failed to delete uploaded file:', err);
+      });
+    }
 
     return {
       ...finalBlueprint,

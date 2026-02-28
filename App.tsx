@@ -19,7 +19,7 @@ import {
   ReconstructionBlueprint,
   PitchDetectionResult,
 } from './types';
-import { GEMINI_MODEL_LABELS } from './services/gemini';
+import { GEMINI_MODEL_LABELS, GEMINI_MODELS } from '@/services/gemini';
 import type { GeminiModelId } from './services/gemini';
 import BlueprintDisplay from './components/BlueprintDisplay';
 import WaveformSkeleton from './components/WaveformSkeleton';
@@ -99,8 +99,7 @@ const App: React.FC = () => {
   const [geminiModel, setGeminiModel] = useState<GeminiModelId>(() => {
     try {
       const stored = localStorage.getItem('sonic-architect-gemini-model');
-      if (stored === 'gemini-2.0-flash' || stored === 'gemini-2.5-flash' || stored === 'gemini-2.5-pro')
-        return stored;
+      if (stored && stored in GEMINI_MODEL_LABELS) return stored as GeminiModelId;
     } catch {}
     return 'gemini-2.5-flash';
   });
@@ -434,23 +433,53 @@ const App: React.FC = () => {
                     </div>
                   </button>
                   {providerType === 'gemini' && (
-                    <div className="px-3 py-2 bg-zinc-950 border-y border-zinc-800 flex gap-2">
-                      {(['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'] as const).map((m) => (
-                        <button
-                          key={m}
-                          onClick={() => {
-                            setGeminiModel(m);
-                            try { localStorage.setItem('sonic-architect-gemini-model', m); } catch {}
-                          }}
-                          className={`flex-1 text-[10px] font-bold py-1.5 rounded border transition-colors ${
-                            geminiModel === m
-                              ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                              : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                          }`}
-                        >
-                          {GEMINI_MODEL_LABELS[m].replace('Gemini ', '')}
-                        </button>
-                      ))}
+                    <div className="px-3 py-2 bg-zinc-950 border-y border-zinc-800 space-y-1.5">
+                      {(() => {
+                        // Group Gemini models by their 'group' field for meaningful UI
+                        type GroupName = string;
+                        const grouped: Record<GroupName, GeminiModelId[]> = {};
+                        Object.entries(GEMINI_MODELS).forEach(([id, meta]) => {
+                          if (!grouped[meta.group]) grouped[meta.group] = [];
+                          grouped[meta.group].push(id as GeminiModelId);
+                        });
+                        // Define display order for groups
+                        const groupOrder = ['stable', 'preview', 'experimental'];
+                        return groupOrder
+                          .filter((group) => grouped[group]?.length)
+                          .map((group) => (
+                            <div key={group} className="mb-1.5">
+                              <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-1">
+                                {group === 'stable'
+                                  ? 'Stable'
+                                  : group === 'preview'
+                                    ? 'Preview'
+                                    : group === 'experimental'
+                                      ? 'Experimental'
+                                      : group}
+                              </div>
+                              <div className="flex gap-1.5">
+                                {grouped[group].map((m) => (
+                                  <button
+                                    key={m}
+                                    onClick={() => {
+                                      setGeminiModel(m);
+                                      try {
+                                        localStorage.setItem('sonic-architect-gemini-model', m);
+                                      } catch {}
+                                    }}
+                                    className={`flex-1 text-[10px] font-bold py-1.5 rounded border transition-colors ${
+                                      geminiModel === m
+                                        ? 'bg-blue-600/20 border-blue-500 text-blue-400'
+                                        : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300'
+                                    }`}
+                                  >
+                                    {GEMINI_MODEL_LABELS[m].replace('Gemini ', '')}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ));
+                      })()}
                     </div>
                   )}
                   <button
