@@ -33,14 +33,20 @@ import { phase1Schema, type GeminiPhase1Response } from './schemas/phase1Schema'
 import { phase2Schema, type GeminiPhase2Additions } from './schemas/phase2Schema';
 import { buildPhase1Prompt } from './prompts/phase1Analysis';
 import { buildPhase2Prompt } from './prompts/phase2Refinement';
+import {
+  startDiagnosticReport,
+  addDiagnosticEntry,
+  finishAndDownloadReport,
+  isDiagEnabled,
+} from './diagnosticLog';
+import { extractJsonFromText } from './extractJson';
 
 export type GeminiModelId =
   | 'gemini-2.0-flash'
   | 'gemini-2.5-flash'
   | 'gemini-2.5-pro'
   | 'gemini-3-flash-preview'
-  | 'gemini-3-pro-image-preview'
-  | 'gemini-3.1-flash-image-preview'
+  | 'gemini-3.1-flash-preview'
   | 'gemini-3.1-pro-preview';
 
 export type GeminiModelGroup = 'experimental' | 'stable' | 'preview';
@@ -53,8 +59,7 @@ export const GEMINI_MODELS: { id: GeminiModelId; label: string; group: GeminiMod
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', group: 'stable' },
   // Legacy/Preview
   { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Preview)', group: 'preview' },
-  { id: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro Image (Preview)', group: 'preview' },
-  { id: 'gemini-3.1-flash-image-preview', label: 'Gemini 3.1 Flash Image (Preview)', group: 'preview' },
+  { id: 'gemini-3.1-flash-preview', label: 'Gemini 3.1 Flash (Preview)', group: 'preview' },
   { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Preview)', group: 'preview' },
 ];
 
@@ -63,6 +68,17 @@ export const GEMINI_MODEL_LABELS: Record<GeminiModelId, string> = Object.fromEnt
 ) as Record<GeminiModelId, string>;
 
 const DEFAULT_MODEL: GeminiModelId = 'gemini-2.5-flash';
+
+/**
+ * Preview models produce significantly shorter/shallower output when forced
+ * into responseMimeType: 'application/json'. Let them respond in free-text
+ * mode and extract JSON from the response instead.
+ */
+const MODELS_WITHOUT_JSON_MODE = new Set<GeminiModelId>([
+  'gemini-3-flash-preview',
+  'gemini-3.1-flash-preview',
+  'gemini-3.1-pro-preview',
+]);
 
 // ---------------------------------------------------------------------------
 // File reading helpers
@@ -289,7 +305,7 @@ function assembleBlueprint(
   hints: LocalDSPHints,
   features: { spectralTimeline?: { timePoints: number[]; bands: { name: string; energyDb: number[] }[] }; spectralBands: Array<{ name: string; rangeHz: [number, number]; averageDb: number; peakDb: number; dominance: string }>; mfcc?: number[] },
   analysisTime: number,
-  modelId: GeminiModelId,
+  _modelId: GeminiModelId,
 ): ReconstructionBlueprint {
   // Start with Phase 1 as the base
   let bpm = phase1.bpm;
@@ -355,15 +371,36 @@ function assembleBlueprint(
   };
 
   // Instrumentation → InstrumentRackElement[]
-  const instrumentation = phase1.instrumentation.map((inst) => ({
-    element: inst.name,
-    timbre: inst.description,
-    frequency: '', // Gemini doesn't return a frequency string per instrument in this shape
-    abletonDevice: inst.abletonDevice,
-  }));
+  // Prefer Phase 2 (actionable device chains) over Phase 1 (basic identification)
+  const phase2Inst = phase2?.instrumentation ?? [];
+  const sourceInstrumentation =
+    phase2Inst.length > 0 ? phase2Inst : phase1.instrumentation;
+
+  const instrumentation = sourceInstrumentation.map((inst) => {
+    // Phase 2 has deviceChain (string) with full signal chain + parameters
+    const deviceChainStr = 'deviceChain' in inst ? (inst.deviceChain as string) : '';
+    const paramNotes = 'parameterNotes' in inst ? (inst.parameterNotes as string) : '';
+    const presetHint = 'presetSuggestion' in inst ? (inst.presetSuggestion as string) : '';
+
+    // Build a rich timbre description
+    const timbreParts = [inst.description];
+    if (paramNotes) timbreParts.push(`\nParameters: ${paramNotes}`);
+    if (presetHint && presetHint !== 'Init') timbreParts.push(`\nPreset: ${presetHint}`);
+
+    return {
+      element: inst.name,
+      timbre: timbreParts.join(''),
+      frequency: '',
+      abletonDevice: deviceChainStr || inst.abletonDevice,
+    };
+  });
 
   // Effects → FXChainItem[]
-  const fxChain = phase1.effectsChain.map((fx) => ({
+  // Prefer Phase 2 (precise settings) over Phase 1 (basic identification)
+  const phase2Fx = phase2?.effectsChain ?? [];
+  const sourceEffects = phase2Fx.length > 0 ? phase2Fx : phase1.effectsChain;
+
+  const fxChain = sourceEffects.map((fx) => ({
     artifact: fx.name,
     recommendation: `${fx.abletonDevice}: ${fx.settings} — ${fx.purpose}`,
   }));
@@ -375,10 +412,16 @@ function assembleBlueprint(
     description: s.description,
   }));
 
-  // Secret Sauce
+  // Secret Sauce — prefer Phase 2 (detailed recreation) over Phase 1 (basic identification)
+  const phase2Sauce = phase2?.secretSauce;
+  const sauceSource =
+    phase2Sauce && phase2Sauce.technique !== 'Not detected'
+      ? phase2Sauce
+      : phase1.secretSauce;
+
   const secretSauce = {
-    trick: phase1.secretSauce.technique,
-    execution: `${phase1.secretSauce.description}\n\n${phase1.secretSauce.abletonImplementation}`,
+    trick: sauceSource.technique,
+    execution: `${sauceSource.description}\n\n${sauceSource.abletonImplementation}`,
   };
 
   // Chord progression from Phase 1
@@ -553,7 +596,7 @@ export class GeminiProvider implements AnalysisProvider {
 
   async analyze(
     file: File,
-    _signal?: AbortSignal,
+    signal?: AbortSignal,
     onProgress?: (message: string) => void
   ): Promise<ReconstructionBlueprint> {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -563,13 +606,19 @@ export class GeminiProvider implements AnalysisProvider {
       );
     }
 
+    signal?.throwIfAborted();
+
     const startTime = performance.now();
     const ai = new GoogleGenAI({ apiKey });
     const modelPath = `models/${this.modelId}`;
 
+    // Diagnostic logging (enable: localStorage.setItem('GEMINI_DIAG', '1'))
+    startDiagnosticReport(this.modelId, modelPath, file.name, file.size);
+
     // Step 1 — PARALLEL: Files API upload + Base DSP
     onProgress?.('Uploading audio...');
     const audioBuffer = await decodeAudioFile(file);
+    signal?.throwIfAborted();
     onProgress?.('Decoding audio...');
 
     let fileUri: string | null = null;
@@ -582,10 +631,12 @@ export class GeminiProvider implements AnalysisProvider {
         uploadToFilesAPI(ai, file),
         runBaseDSP(audioBuffer),
       ]);
+      signal?.throwIfAborted();
       fileUri = uploadResult.fileUri;
       fileName = uploadResult.fileName;
       hints = dspResult;
     } catch (err) {
+      signal?.throwIfAborted();
       // If upload fails, fall back to inline base64 for Phase 1
       console.warn('[GeminiProvider] Files API upload failed, using inline base64:', err);
       base64Fallback = await readFileAsBase64(file);
@@ -600,23 +651,63 @@ export class GeminiProvider implements AnalysisProvider {
       : buildInlineAudioPart(base64Fallback!, file.type);
 
     // Step 2 — Phase 1: Audio + Hints → GeminiPhase1Response
+    signal?.throwIfAborted();
     onProgress?.('Analyzing with Gemini (Phase 1)...');
+    const useJsonMode = !MODELS_WITHOUT_JSON_MODE.has(this.modelId);
     let phase1: GeminiPhase1Response;
     try {
       phase1 = await withRetry(async () => {
+        signal?.throwIfAborted();
+        const basePrompt = buildPhase1Prompt(hints);
+        const phase1Prompt = useJsonMode
+          ? basePrompt
+          : basePrompt +
+            '\n\nRespond with ONLY a single JSON object. Do not include any markdown formatting, commentary, or text outside the JSON.';
+        const phase1Start = performance.now();
+
         const response = await ai.models.generateContent({
           model: modelPath,
           contents: [
             {
               parts: [
                 audioPart,
-                { text: buildPhase1Prompt(hints) },
+                { text: phase1Prompt },
               ],
             },
           ],
-          config: { responseMimeType: 'application/json' },
+          config: useJsonMode
+            ? { responseMimeType: 'application/json' }
+            : undefined,
         });
-        return parsePhase1Response(response.text ?? '{}', hints);
+
+        let rawText = response.text ?? '{}';
+        if (!useJsonMode) {
+          rawText = extractJsonFromText(rawText);
+        }
+
+        // Diagnostic capture
+        if (isDiagEnabled()) {
+          addDiagnosticEntry({
+            phase: 'phase1',
+            model: this.modelId,
+            modelPath,
+            audioPartType: fileUri ? 'fileData' : 'inlineData',
+            audioMimeType: file.type,
+            fileUri: fileUri ?? undefined,
+            promptLength: phase1Prompt.length,
+            promptPreview: phase1Prompt.slice(0, 500),
+            configSent: useJsonMode
+              ? { responseMimeType: 'application/json' }
+              : { responseMimeType: 'none (free-text)' },
+            responseLength: rawText.length,
+            responseFirst500: rawText.slice(0, 500),
+            responseLast200: rawText.slice(-200),
+            responseFullText: rawText,
+            durationMs: Math.round(performance.now() - phase1Start),
+          });
+        }
+
+        return parsePhase1Response(rawText, hints);
       }, 'Phase 1');
     } catch (err) {
       // Phase 1 failed after retry → fall back to full Local mode
@@ -650,23 +741,62 @@ export class GeminiProvider implements AnalysisProvider {
     }
 
     // Step 3 — Phase 2: Audio + Phase 1 + Hints → GeminiPhase2Additions
+    signal?.throwIfAborted();
     onProgress?.('Refining analysis (Phase 2)...');
     let phase2: GeminiPhase2Additions | null = null;
     try {
       phase2 = await withRetry(async () => {
+        signal?.throwIfAborted();
+        const baseP2 = buildPhase2Prompt(phase1, hints);
+        const phase2Prompt = useJsonMode
+          ? baseP2
+          : baseP2 +
+            '\n\nRespond with ONLY a single JSON object. Do not include any markdown formatting, commentary, or text outside the JSON.';
+        const phase2Start = performance.now();
+
         const response = await ai.models.generateContent({
           model: modelPath,
           contents: [
             {
               parts: [
                 audioPart,
-                { text: buildPhase2Prompt(phase1, hints) },
+                { text: phase2Prompt },
               ],
             },
           ],
-          config: { responseMimeType: 'application/json' },
+          config: useJsonMode
+            ? { responseMimeType: 'application/json' }
+            : undefined,
         });
-        return parsePhase2Response(response.text ?? '{}');
+
+        let rawText = response.text ?? '{}';
+        if (!useJsonMode) {
+          rawText = extractJsonFromText(rawText);
+        }
+
+        // Diagnostic capture
+        if (isDiagEnabled()) {
+          addDiagnosticEntry({
+            phase: 'phase2',
+            model: this.modelId,
+            modelPath,
+            audioPartType: fileUri ? 'fileData' : 'inlineData',
+            audioMimeType: file.type,
+            fileUri: fileUri ?? undefined,
+            promptLength: phase2Prompt.length,
+            promptPreview: phase2Prompt.slice(0, 500),
+            configSent: useJsonMode
+              ? { responseMimeType: 'application/json' }
+              : { responseMimeType: 'none (free-text)' },
+            responseLength: rawText.length,
+            responseFirst500: rawText.slice(0, 500),
+            responseLast200: rawText.slice(-200),
+            responseFullText: rawText,
+            durationMs: Math.round(performance.now() - phase2Start),
+          });
+        }
+
+        return parsePhase2Response(rawText);
       }, 'Phase 2');
     } catch (err) {
       // Phase 2 failed — use Phase 1 results only (still good)
@@ -677,6 +807,9 @@ export class GeminiProvider implements AnalysisProvider {
     onProgress?.('Building blueprint...');
     const analysisTime = Math.round(performance.now() - startTime);
     const blueprint = assembleBlueprint(phase1, phase2, hints, features, analysisTime, this.modelId);
+
+    // Diagnostic: download comparison file
+    finishAndDownloadReport(analysisTime);
 
     // Step 5 — Clean up uploaded file (fire-and-forget)
     if (fileName) {

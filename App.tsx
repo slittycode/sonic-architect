@@ -228,6 +228,7 @@ const App: React.FC = () => {
         const errorName = getErrorName(err);
         if (errorName === 'AbortError') {
           setStatus(AnalysisStatus.IDLE);
+          setProgressMessage('');
           setError(null);
           return null;
         }
@@ -346,7 +347,10 @@ const App: React.FC = () => {
                 <span className="hidden sm:inline">{providerLabel}</span>
               </button>
               {showSettings && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 overflow-hidden">
+                <div
+                  className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-2xl z-50 overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="px-3 py-2 border-b border-zinc-800">
                     <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
                       Analysis Engine

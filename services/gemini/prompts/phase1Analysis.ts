@@ -1,23 +1,43 @@
 /**
- * Phase 1 Analysis Prompt
+ * Phase 1 Analysis Prompt — Detection Pass
  *
- * Comprehensive audio analysis with local DSP hints as context.
- * Gemini receives the audio file + these hints and returns a full
- * GeminiPhase1Response JSON.
+ * Phase 1 is the "ears": exhaustive identification of every sonic element,
+ * chord change, arrangement section, and production characteristic.
+ * No detailed Ableton device chains here — that's Phase 2's job.
  */
 
 import type { LocalDSPHints } from '@/types';
 
-const SYSTEM_PREAMBLE = `You are analyzing audio for an Ableton Live 12 producer. All device names, parameter names, and workflow suggestions must be specific to Ableton Live 12.
+const SYSTEM_PREAMBLE = `You are a world-class audio analysis engine. Your job is to listen to the audio and identify EVERYTHING you hear — every sonic element, every chord change, every section, every production characteristic. Be exhaustive and precise.
 
-The user wants to understand the sonic character of each element and how to recreate it.`;
+You are NOT giving production advice yet. That comes later. Right now, focus entirely on DETECTION and DESCRIPTION.
+
+## MANDATORY RULES — READ BEFORE ANALYZING
+
+These rules are NON-NEGOTIABLE. If your response violates any of them, it will be rejected:
+
+1. **MINIMUM 8 ELEMENTS.** You must identify at least 8 distinct sonic elements. Most tracks have 10-15. If you return fewer than 8, you have not listened carefully enough.
+
+2. **VOCALS ARE MANDATORY TO CHECK.** Read the track title and artist name. If there is ANY singing, vocal chops, spoken word, or processed vocal texture, you MUST list each as a separate element. Do NOT default to "instrumental" without careful listening. The track "Lika Star - Вспоминай" obviously contains vocals — ignoring them is a critical failure.
+
+3. **PERCUSSION MUST BE ITEMIZED.** List EACH percussion element separately: kick, snare/clap, closed hi-hat, open hi-hat, ride, crash, shaker, tambourine, percussion loops. Do NOT collapse them into a single "drums" element.
+
+4. **CHORD PROGRESSIONS MUST HAVE MULTIPLE ENTRIES.** If the track has a chord loop (most do), list each chord change with its timestamp. Only return a single chord if the track is truly a one-chord drone with zero harmonic movement.
+
+5. **SCAN ALL FREQUENCY BANDS.** Systematically check:
+   - Sub/Bass (20-200 Hz): kick, sub-bass, bass synth
+   - Low-Mid (200-800 Hz): bass body, warm pads, lower vocals, toms
+   - Mid (800-2500 Hz): lead synths, chord stabs, vocal body, snare body
+   - High-Mid (2.5-6 kHz): vocal presence, synth brightness, snare crack
+   - High (6-20 kHz): hi-hats, cymbals, rides, sibilance, white noise, air
+
+6. **USE THE TRACK TITLE FOR CLUES.** The title and artist name often indicate genre, language, and content. "Hard Progressive Mix" means hard progressive — not dub techno. A Russian artist name with a Russian title suggests Russian-language vocals.`;
 
 /**
  * Build the Phase 1 prompt text.
  * @param hints - Local DSP measurements (BPM, key, spectral, chords, etc.)
  */
 export function buildPhase1Prompt(hints: LocalDSPHints): string {
-  // Compact the hints (drop large arrays like rmsEnvelope, mfcc to save tokens)
   const compactHints = {
     bpm: hints.bpm,
     bpmConfidence: hints.bpmConfidence,
@@ -62,15 +82,15 @@ export function buildPhase1Prompt(hints: LocalDSPHints): string {
 
 ## Local DSP Hints
 
-These are approximate measurements from a local DSP engine. Use them as starting points but trust your own analysis of the audio.
+These are approximate measurements from a local DSP engine. Use them as starting points but trust your own ears over these values.
 
 \`\`\`json
 ${JSON.stringify(compactHints, null, 2)}
 \`\`\`
 
-## Task
+## Response Format
 
-Listen to the audio carefully and provide a comprehensive reconstruction blueprint. Return a JSON object with this exact structure:
+Return a JSON object with this exact structure:
 
 {
   "bpm": <number>,
@@ -78,73 +98,81 @@ Listen to the audio carefully and provide a comprehensive reconstruction bluepri
   "key": "<e.g. C minor>",
   "keyConfidence": <0-1>,
   "timeSignature": "<e.g. 4/4>",
-  "genre": "<primary genre>",
+  "genre": "<primary genre — use track title for clues>",
   "subGenre": "<sub-genre if applicable>",
   "groove": "<e.g. four-on-the-floor, broken beat, swing>",
   "grooveDescription": "<detailed description of the rhythmic feel>",
   "energy": <0-1>,
   "chordProgression": {
     "chords": [{ "chord": "<e.g. Am7>", "startTime": <seconds>, "duration": <seconds> }],
-    "summary": "<e.g. i-VI-III-VII progression in Am, typical of melodic techno>"
+    "summary": "<progression description with Roman numerals>"
   },
   "elements": [
     {
-      "name": "<e.g. Sub-Bass, Kick, Lead Synth, Pad, Hi-Hats, Vocals>",
-      "frequencyRange": "<e.g. 20-80 Hz>",
-      "sonicCharacter": "<what it sounds like>",
-      "howToRecreate": "<Ableton Live 12 specific instructions>",
-      "suggestedDevices": ["<Ableton device names>"],
-      "role": "<foundation, rhythm, melody, texture, atmosphere>"
+      "name": "<specific name, e.g. 'Closed Hi-Hat', 'Lead Vocal', 'Filtered Pad'>",
+      "frequencyRange": "<e.g. 8000-12000 Hz>",
+      "sonicCharacter": "<detailed: timbre, texture, tone, what it reminds you of>",
+      "howToRecreate": "<basic synthesis/sampling approach>",
+      "suggestedDevices": ["<Ableton Live 12 device names>"],
+      "role": "<foundation/rhythm/melody/texture/atmosphere/vocal/fx>"
     }
   ],
   "detectedCharacteristics": {
     "sidechain": { "present": <bool>, "description": "<details>", "strength": "<subtle/medium/heavy>" },
     "acidResonance": { "present": <bool>, "description": "<details>" },
-    "reverbCharacter": { "present": <bool>, "description": "<details>", "estimatedDecay": "<e.g. 2.5s>" },
-    "distortion": { "present": <bool>, "description": "<details>", "type": "<saturation/bitcrush/wavefold>" },
+    "reverbCharacter": { "present": <bool>, "description": "<type, tone, decay>", "estimatedDecay": "<e.g. 2.5s>" },
+    "distortion": { "present": <bool>, "description": "<details>", "type": "<saturation/bitcrush/wavefold/overdrive>" },
     "supersawLayers": { "present": <bool>, "description": "<details>" },
-    "vocalPresence": { "present": <bool>, "description": "<details>", "type": "<lead/chopped/processed/background>" },
-    "bassCharacter": { "description": "<details>", "type": "<sub/reese/acid/pluck>" },
-    "groove": { "swingAmount": "<percentage or description>", "description": "<groove feel details>" }
+    "vocalPresence": { "present": <bool>, "description": "<vocal type, register, processing>", "type": "<lead/chopped/processed/background/none>" },
+    "bassCharacter": { "description": "<bass tone and behavior>", "type": "<sub/reese/acid/pluck/808/fm>" },
+    "groove": { "swingAmount": "<percentage or description>", "description": "<groove feel>" }
   },
   "arrangement": [
     {
-      "section": "<intro/buildup/drop/breakdown/verse/chorus/outro>",
+      "section": "<intro/verse/chorus/buildup/drop/breakdown/bridge/outro>",
       "startTime": <seconds>,
       "endTime": <seconds>,
-      "description": "<what happens in this section>",
+      "description": "<which elements enter, exit, change>",
       "energyLevel": <0-1>
     }
   ],
   "instrumentation": [
     {
-      "name": "<instrument name>",
-      "type": "<synth/sample/acoustic/vocal>",
-      "description": "<sonic description>",
-      "abletonDevice": "<full Ableton 12 signal chain, e.g. 'Operator > Saturator > EQ Eight > Reverb', plus key settings: oscillator type/waveform, ADSR values, filter cutoff and resonance, FM ratios, drive/mix amounts, and sidechain routing if this element triggers ducking>"
+      "name": "<instrument/sound name>",
+      "type": "<synth/sample/acoustic/vocal/drum-machine>",
+      "description": "<what it sounds like and its role>",
+      "abletonDevice": "<likely Ableton device>"
     }
   ],
   "effectsChain": [
     {
-      "name": "<effect name>",
-      "type": "<reverb/delay/distortion/filter/compressor/etc>",
-      "purpose": "<why it's used>",
-      "abletonDevice": "<Ableton device name>",
-      "settings": "<key settings to match the sound>"
+      "name": "<effect heard>",
+      "type": "<reverb/delay/distortion/filter/compressor/chorus/phaser/etc>",
+      "purpose": "<what sonic role it plays>",
+      "abletonDevice": "<likely Ableton device>",
+      "settings": "<approximate settings you can hear>"
     }
   ],
   "secretSauce": {
-    "technique": "<the defining production technique>",
+    "technique": "<the single most defining production technique>",
     "description": "<how it shapes the track's character>",
-    "abletonImplementation": "<step-by-step Ableton recreation>"
+    "abletonImplementation": "<basic approach — detailed recreation in Phase 2>"
   },
   "genreAnalysis": {
     "primary": "<primary genre>",
     "secondary": ["<secondary genres>"],
     "confidence": <0-1>,
-    "reasoning": "<why this genre classification>"
+    "reasoning": "<why this classification, referencing sonic evidence AND the track title>"
   }
 }
 
-Be thorough and specific. For each instrumentation item, the "abletonDevice" field must include the full signal chain (e.g. "Operator > Saturator > Reverb") AND key parameter values — oscillator waveforms, ADSR envelope times, filter cutoff/resonance, FM ratios, drive/mix percentages, and sidechain routing if applicable. This is the primary field used for Ableton Live 12 recreation. Focus on actionable, copy-paste-ready production advice.`;
+## FINAL CHECKLIST — Verify before responding:
+
+□ Did I list at least 8 elements?
+□ Did I check for vocals? (Read the artist/title: does it suggest singing?)
+□ Did I list hi-hats, cymbals, and percussion separately?
+□ Did I list multiple chord changes with timestamps?
+□ Did I check all 5 frequency bands for content?
+□ Does my genre match what the track title suggests?
+□ Are my sonicCharacter descriptions specific (not generic)?`;
 }
