@@ -243,7 +243,7 @@ export function trackBeats(audioBuffer: AudioBuffer, tempoHint?: number): BeatTr
   beatFrames.reverse();
 
   // Convert frame indices to seconds
-  const beats = beatFrames.map((f) => Math.round((f * hopSize / sampleRate) * 1000) / 1000);
+  const beats = beatFrames.map((f) => Math.round(((f * hopSize) / sampleRate) * 1000) / 1000);
 
   // --- Downbeat detection ---
   // Accumulate onset energy at each candidate phase within a 4-beat window.

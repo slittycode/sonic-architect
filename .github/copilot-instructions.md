@@ -48,6 +48,7 @@ Cloud providers follow the same pattern: run `LocalAnalysisProvider` for determi
 ### DSP Pipeline
 
 `services/audioAnalysis.ts` decodes audio and extracts features (BPM, key, spectral bands, RMS profile, onsets). Supporting modules:
+
 - `bpmDetection.ts` — Autocorrelation-based BPM detection
 - `keyDetection.ts` — Krumhansl-Schmuckler key detection
 - `chordDetection.ts` — Chord progression analysis

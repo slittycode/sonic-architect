@@ -22,18 +22,19 @@ Only tasks 1 and 2 actually benefit from native audio understanding. Task 3 is t
 
 ### Current State
 
-| Provider | Model | Audio Input | Notes |
-|----------|-------|-------------|-------|
-| Gemini   | gemini-2.5-flash | ✅ Native | Default; good speed/cost balance |
-| Gemini   | gemini-2.0-flash | ✅ Native | Older/cheaper option |
-| Claude   | claude-opus-4-6 | ❌ Text only | Blueprint JSON only, no audio — skipped for now |
-| Ollama   | llama3.2 (default) | ❌ Text only | Local; JSON blueprint only |
+| Provider | Model              | Audio Input  | Notes                                           |
+| -------- | ------------------ | ------------ | ----------------------------------------------- |
+| Gemini   | gemini-2.5-flash   | ✅ Native    | Default; good speed/cost balance                |
+| Gemini   | gemini-2.0-flash   | ✅ Native    | Older/cheaper option                            |
+| Claude   | claude-opus-4-6    | ❌ Text only | Blueprint JSON only, no audio — skipped for now |
+| Ollama   | llama3.2 (default) | ❌ Text only | Local; JSON blueprint only                      |
 
 ### AWS Bedrock — Investigation Result: Not Suitable
 
 Bedrock was investigated as a potential provider. **Conclusion: not suitable for this use case.**
 
 Bedrock does not give any foundation model raw audio input. Its audio workflow is:
+
 1. Upload audio to S3
 2. Transcribe via Amazon Transcribe or Whisper (speech → text)
 3. Pass transcript text to a Bedrock LLM
@@ -43,6 +44,7 @@ This speech-transcription approach doesn't work for music analysis — you can't
 ### Model Landscape Assessment
 
 #### 1. Gemini 2.5 Pro (highest-impact quick win)
+
 - **Audio**: ✅ Native (same as Flash but deeper reasoning)
 - **Vs Flash**: Benchmarks consistently show Pro outperforms Flash on deep reasoning + multimodal accuracy
 - **Cost**: ~3-4x higher than Flash per token
@@ -50,6 +52,7 @@ This speech-transcription approach doesn't work for music analysis — you can't
 - **Verdict**: Best bang-for-buck improvement. Ideal for users who want maximum quality.
 
 #### 2. OpenAI GPT-4o Audio (best alternative provider)
+
 - **Audio**: ✅ Native multimodal (base64 audio in `/chat/completions`)
 - **Strengths**: Strong genre/mood/vocal analysis; natural audio dialogue; 128k context
 - **No 20 MB cap issue**: Sends base64 chunks rather than inline file upload
@@ -58,12 +61,14 @@ This speech-transcription approach doesn't work for music analysis — you can't
 - **Verdict**: The only other frontier model with native audio understanding. Worth adding as a provider.
 
 #### 3. Qwen2-Audio via Ollama (best local upgrade)
+
 - **Audio**: ✅ Purpose-built audio-language model (Alibaba, open source)
 - **Strengths**: Specifically benchmarked on music tasks (MusicCaps, MMAR); outperforms Gemini 1.5 Pro on audio benchmarks; 7B params runs locally
 - **Integration**: Available via Ollama (`qwen2-audio`) — user would `ollama pull qwen2-audio`
 - **Verdict**: Best option for users who want privacy/offline use. Huge quality upgrade over llama3.2 for audio tasks.
 
 #### 4. Gemini — Prompt Engineering (free improvement)
+
 - The verification prompt could be more specific about Ableton 12 devices and genre-specific instrumentation
 - The enhancement prompt could explicitly request MIDI note ranges, synthesis patch parameters, and sidechain compression tips
 
@@ -71,12 +76,12 @@ This speech-transcription approach doesn't work for music analysis — you can't
 
 ## Recommendations (Priority Order)
 
-| Priority | Change | Effort | Impact |
-|----------|--------|--------|--------|
-| 1 | Add `gemini-2.5-pro` as model option | Low | Medium-High |
-| 2 | Add OpenAI provider (GPT-4o audio) | Medium | High |
-| 3 | Add Qwen2-Audio to Ollama model list + documentation | Low | High (local users) |
-| 4 | Refine prompts (Gemini + Ollama providers) | Low | Medium |
+| Priority | Change                                               | Effort | Impact             |
+| -------- | ---------------------------------------------------- | ------ | ------------------ |
+| 1        | Add `gemini-2.5-pro` as model option                 | Low    | Medium-High        |
+| 2        | Add OpenAI provider (GPT-4o audio)                   | Medium | High               |
+| 3        | Add Qwen2-Audio to Ollama model list + documentation | Low    | High (local users) |
+| 4        | Refine prompts (Gemini + Ollama providers)           | Low    | Medium             |
 
 ---
 

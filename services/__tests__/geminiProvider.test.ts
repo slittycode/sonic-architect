@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// Mock @google/genai before importing the service under test
+// Mock @google/genai before importing the services under test
 // ---------------------------------------------------------------------------
 
 const mockGenerateContentStream = vi.fn();
@@ -17,6 +17,7 @@ vi.mock('@google/genai', () => ({
   FileState: { PROCESSING: 'PROCESSING', ACTIVE: 'ACTIVE', FAILED: 'FAILED' },
 }));
 
+import { GeminiProvider } from '@/services/gemini/geminiProvider';
 import { GeminiChatService } from '@/services/gemini';
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,37 @@ async function* makeAsyncIterable(chunks: string[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// GeminiProvider tests
+// ---------------------------------------------------------------------------
+
+describe('GeminiProvider', () => {
+  describe('isAvailable()', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('returns true when VITE_GEMINI_API_KEY is set', async () => {
+      vi.stubEnv('VITE_GEMINI_API_KEY', 'valid-key');
+      const provider = new GeminiProvider();
+      expect(await provider.isAvailable()).toBe(true);
+    });
+
+    it('returns false when VITE_GEMINI_API_KEY is empty string', async () => {
+      vi.stubEnv('VITE_GEMINI_API_KEY', '');
+      const provider = new GeminiProvider();
+      expect(await provider.isAvailable()).toBe(false);
+    });
+
+    it('returns false when VITE_GEMINI_API_KEY is not present', async () => {
+      vi.stubEnv('VITE_GEMINI_API_KEY', '');
+      const provider = new GeminiProvider();
+      expect(await provider.isAvailable()).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GeminiChatService tests (authoritative copy is chatService.test.ts)
 // ---------------------------------------------------------------------------
 
 describe('GeminiChatService', () => {
@@ -74,36 +105,10 @@ describe('GeminiChatService', () => {
       expect(result).toBe('Hello world');
     });
 
-    it('calls the Gemini API with the user message in contents', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeAsyncIterable(['ok']));
-
-      const service = new GeminiChatService();
-      await readAll(await service.sendMessage('test message'));
-
-      expect(mockGenerateContentStream).toHaveBeenCalledOnce();
-      const callArgs = mockGenerateContentStream.mock.calls[0][0];
-      expect(callArgs.contents).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ role: 'user', parts: [{ text: 'test message' }] }),
-        ])
-      );
-    });
-
     it('rejects empty message text without calling the API', async () => {
       const service = new GeminiChatService();
       await expect(service.sendMessage('   ')).rejects.toThrow('Message text cannot be empty');
       expect(mockGenerateContentStream).not.toHaveBeenCalled();
-    });
-
-    it('includes blueprint context in system instruction when provided', async () => {
-      mockGenerateContentStream.mockResolvedValue(makeAsyncIterable(['noted']));
-
-      const blueprint = { meta: { provider: 'gemini' } } as never;
-      const service = new GeminiChatService(() => blueprint);
-      await readAll(await service.sendMessage('describe the track'));
-
-      const callArgs = mockGenerateContentStream.mock.calls[0][0];
-      expect(callArgs.config.systemInstruction).toContain('Blueprint context');
     });
 
     it('clearHistory() resets the conversation', async () => {

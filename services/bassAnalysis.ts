@@ -30,10 +30,7 @@ const MAX_DECAY_MS = 2000; // Cap at 2 seconds
 /**
  * Analyze bass decay characteristics.
  */
-export function analyzeBassDecay(
-  audioBuffer: AudioBuffer,
-  bpm: number
-): BassDecayResult {
+export function analyzeBassDecay(audioBuffer: AudioBuffer, bpm: number): BassDecayResult {
   const sampleRate = audioBuffer.sampleRate;
   const channelData = audioBuffer.getChannelData(0);
 
@@ -65,12 +62,7 @@ export function analyzeBassDecay(
       Math.floor((MAX_DECAY_MS / 1000) * sampleRate)
     );
 
-    const decayMs = measureDecayTime(
-      bassSignal,
-      onsetSample,
-      maxDecaySamples,
-      sampleRate
-    );
+    const decayMs = measureDecayTime(bassSignal, onsetSample, maxDecaySamples, sampleRate);
 
     if (decayMs > 0) {
       decayTimes.push(decayMs);
@@ -112,10 +104,7 @@ export function analyzeBassDecay(
 /**
  * Extract bass band using one-pole lowpass at 150Hz.
  */
-function extractBassBandSimple(
-  signal: Float32Array,
-  sampleRate: number
-): Float32Array {
+function extractBassBandSimple(signal: Float32Array, sampleRate: number): Float32Array {
   const result = new Float32Array(signal.length);
 
   // One-pole lowpass at 150Hz
@@ -135,18 +124,14 @@ function extractBassBandSimple(
 /**
  * Find bass transients using energy-based onset detection.
  */
-function findBassOnsets(
-  bassSignal: Float32Array,
-  sampleRate: number,
-  bpm: number
-): number[] {
+function findBassOnsets(bassSignal: Float32Array, sampleRate: number, bpm: number): number[] {
   const hopSize = Math.floor(sampleRate * 0.01); // 10ms hops
   const frameSize = Math.floor(sampleRate * 0.04); // 40ms frames
   const onsets: number[] = [];
 
   // Calculate minimum distance between onsets based on BPM
   const beatDurationMs = (60 / bpm) * 1000;
-  const minOnsetDistance = Math.floor((beatDurationMs * 0.25 / 1000) * sampleRate); // ~1/16th note
+  const minOnsetDistance = Math.floor(((beatDurationMs * 0.25) / 1000) * sampleRate); // ~1/16th note
 
   let prevEnergy = 0;
   const threshold = 0.005;
@@ -242,10 +227,7 @@ function calculateTransientRatio(
  * Estimate fundamental frequency using zero-crossing rate.
  * Simple but effective for monophonic bass.
  */
-function estimateFundamentalZCR(
-  signal: Float32Array,
-  sampleRate: number
-): number {
+function estimateFundamentalZCR(signal: Float32Array, sampleRate: number): number {
   let crossings = 0;
   let lastSample = 0;
 
@@ -304,8 +286,7 @@ export function detectSwing(beatPositions: number[]): SwingResult {
   // Calculate mean and variance of intervals
   const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
   const variance =
-    intervals.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) /
-    intervals.length;
+    intervals.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / intervals.length;
   const stdDev = Math.sqrt(variance);
 
   // Coefficient of variation (normalized std dev)

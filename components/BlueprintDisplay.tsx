@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles, Drum, Fingerprint, Music } from 'lucide-react';
+import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles, Drum, Fingerprint, Music, Stethoscope } from 'lucide-react';
 import { ReconstructionBlueprint } from '../types';
 import MixDoctorPanel from './MixDoctorPanel';
 import SpectralAreaChart from './SpectralAreaChart';
@@ -128,7 +128,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
 
   const toggleSpectralMode = (next: 'proportional' | 'absolute') => {
     setSpectralMode(next);
-    try { localStorage.setItem('sonic-spectral-mode', next); } catch {}
+    try { localStorage.setItem('sonic-spectral-mode', next); } catch { }
   };
 
   return (
@@ -151,6 +151,31 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
                 <TelemetryItem label="Genre" value={blueprint.telemetry.detectedGenre} />
               )}
               <TelemetryItem label="Groove" value={blueprint.telemetry.groove} />
+
+              {/* Gemini Genre Analysis */}
+              {blueprint.telemetry.genreAnalysis && (
+                <div className="p-3 bg-zinc-950 rounded border border-zinc-800">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">
+                      Genre Analysis
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-900/30 text-blue-400 rounded-full border border-blue-400/20">
+                      {Math.round(blueprint.telemetry.genreAnalysis.confidence * 100)}% conf
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-zinc-300">
+                    {blueprint.telemetry.genreAnalysis.primary}
+                  </p>
+                  {blueprint.telemetry.genreAnalysis.secondary.length > 0 && (
+                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                      Also: {blueprint.telemetry.genreAnalysis.secondary.join(', ')}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-zinc-600 mt-1 leading-relaxed">
+                    {blueprint.telemetry.genreAnalysis.reasoning}
+                  </p>
+                </div>
+              )}
 
               {/* Beat Tracking */}
               {blueprint.telemetry.beatPositions && blueprint.telemetry.beatPositions.length > 0 && (
@@ -435,6 +460,49 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         </div>
       </div>
 
+      {/* Sonic Elements — Gemini V2 */}
+      {blueprint.telemetry.elements && blueprint.telemetry.elements.length > 0 && (
+        <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-cyan-400" aria-hidden="true" />
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+              Sonic Elements
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-zinc-800">
+            {blueprint.telemetry.elements.map((el, idx) => (
+              <div key={idx} className="p-4 bg-zinc-900 hover:bg-zinc-800/30 transition-colors">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <h4 className="text-sm font-bold text-cyan-400">{el.name}</h4>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-zinc-800 text-zinc-500 rounded border border-zinc-700 shrink-0">
+                    {el.frequencyRange}
+                  </span>
+                </div>
+                {el.role && (
+                  <span className="text-[10px] px-2 py-0.5 bg-violet-900/30 text-violet-400 rounded-full border border-violet-400/20 mb-2 inline-block">
+                    {el.role}
+                  </span>
+                )}
+                <p className="text-xs text-zinc-400 italic mb-1.5">{el.sonicCharacter}</p>
+                <p className="text-xs text-zinc-500 leading-relaxed mb-2">{el.howToRecreate}</p>
+                {el.suggestedDevices.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {el.suggestedDevices.map((d, i) => (
+                      <span
+                        key={i}
+                        className="text-[10px] px-2 py-0.5 bg-emerald-900/20 text-emerald-400 rounded border border-emerald-400/20"
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Spectral Timeline Visualization */}
       {blueprint.spectralTimeline && blueprint.spectralTimeline.timePoints.length > 0 && (
         <div className="space-y-6 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -449,11 +517,10 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
                   <button
                     key={m}
                     onClick={() => toggleSpectralMode(m)}
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors ${
-                      spectralMode === m
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors ${spectralMode === m
                         ? 'bg-violet-600/20 border-violet-500 text-violet-400'
                         : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                    }`}
+                      }`}
                   >
                     {m === 'proportional' ? '%' : 'abs'}
                   </button>
@@ -549,13 +616,109 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
         </div>
       )}
 
-      {/* Mix Doctor Dashboard */}
-      {blueprint.mixReport && <MixDoctorPanel report={blueprint.mixReport} />}
+      {/* Mix Feedback — Gemini prose or Local numeric report */}
+      {blueprint.mixFeedback ? (
+        <div className="mt-8 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 text-rose-400" aria-hidden="true" />
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+              Mix Feedback
+            </h3>
+          </div>
+          <div className="p-6 space-y-5">
+            <p className="text-sm text-zinc-300 leading-relaxed">
+              {blueprint.mixFeedback.overallAssessment}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(
+                [
+                  ['Spectral Balance', blueprint.mixFeedback.spectralBalance],
+                  ['Stereo Field', blueprint.mixFeedback.stereoField],
+                  ['Dynamics', blueprint.mixFeedback.dynamics],
+                  ['Low End', blueprint.mixFeedback.lowEnd],
+                  ['High End', blueprint.mixFeedback.highEnd],
+                ] as [string, string][]
+              )
+                .filter(([, v]) => v)
+                .map(([label, value]) => (
+                  <div key={label} className="p-3 bg-zinc-950 rounded border border-zinc-800">
+                    <p className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider mb-1">
+                      {label}
+                    </p>
+                    <p className="text-xs text-zinc-400 leading-relaxed">{value}</p>
+                  </div>
+                ))}
+            </div>
+            {blueprint.mixFeedback.suggestions.length > 0 && (
+              <ul className="space-y-1.5">
+                {blueprint.mixFeedback.suggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-zinc-400">
+                    <span className="text-rose-400 shrink-0 mt-0.5">›</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      ) : blueprint.mixReport ? (
+        <MixDoctorPanel report={blueprint.mixReport} />
+      ) : null}
 
-      {/* Enhanced Analysis Panel — only when local provider has populated analysis data */}
-      {blueprint.telemetry.sidechainAnalysis && (
+      {/* Detected Characteristics — Gemini cards or Local Enhanced Analysis */}
+      {blueprint.telemetry.detectedCharacteristics ? (
+        <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+            <Fingerprint className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+              Detected Characteristics
+            </h3>
+          </div>
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(
+              Object.entries(blueprint.telemetry.detectedCharacteristics) as [
+                string,
+                Record<string, unknown>,
+              ][]
+            )
+              .filter(([, v]) => v && typeof v === 'object')
+              .map(([key, val]) => (
+                <div key={key} className="p-3 bg-zinc-950 rounded border border-zinc-800">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-zinc-300 capitalize">
+                      {key.replace(/([A-Z])/g, ' $1').trim()}
+                    </span>
+                    {'present' in val && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full border ${val.present ? 'bg-emerald-900/20 text-emerald-400 border-emerald-400/20' : 'bg-zinc-800 text-zinc-600 border-zinc-700'}`}
+                      >
+                        {val.present ? 'Detected' : 'Absent'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed">
+                    {String(val.description ?? '')}
+                  </p>
+                  {val.strength && (
+                    <p className="text-[10px] text-zinc-600 mt-0.5">
+                      Strength: {String(val.strength)}
+                    </p>
+                  )}
+                  {val.estimatedDecay && (
+                    <p className="text-[10px] text-zinc-600 mt-0.5">
+                      Decay: {String(val.estimatedDecay)}
+                    </p>
+                  )}
+                  {val.type && (
+                    <p className="text-[10px] text-zinc-600 mt-0.5">Type: {String(val.type)}</p>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : blueprint.telemetry.sidechainAnalysis ? (
         <EnhancedAnalysisPanel telemetry={blueprint.telemetry} />
-      )}
+      ) : null}
     </>
   );
 };

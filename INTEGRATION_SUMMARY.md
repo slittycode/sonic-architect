@@ -16,22 +16,22 @@ The central orchestration point for all analysis. Runs features in parallel wher
 async analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<ReconstructionBlueprint> {
   // 1. Extract base features (spectral bands, loudness, stereo, MFCC)
   const features = extractAudioFeatures(audioBuffer);
-  
+
   // 2. Essentia.js WASM features (dissonance, HFC, spectralComplexity, ZCR)
   const essentiaFeatures = await extractEssentiaFeatures(audioBuffer);
-  
+
   // 3. HPSS for harmonic/percussive separation
   const hpss = separateHarmonicPercussive(audioBuffer);
-  
+
   // 4. Chord detection on harmonic-only audio
   const chordResult = detectChords(harmonicBuffer);
-  
+
   // 5. Beat tracking for rhythm analysis
   const beatResult = trackBeats(audioBuffer, features.bpm);
-  
+
   // 6. Polyphonic pitch detection (Basic Pitch) for supersaw analysis
   const polyphonicNotes = await detectPolyphonic(audioBuffer, features.bpm);
-  
+
   // 7. Enhanced genre classification (runs ALL specialized detectors)
   const enhancedGenreResult = await classifyGenreEnhanced(
     features,
@@ -39,13 +39,14 @@ async analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<ReconstructionBluepr
     beatResult.beats,
     polyphonicNotes
   );
-  
+
   // 8. Build blueprint with all telemetry
   return buildLocalBlueprint(features, analysisTime, chordResult, enhancedGenreResult);
 }
 ```
 
 **Execution Flow:**
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   AudioBuffer Input                          │
@@ -111,6 +112,7 @@ const supersawResult = detectSupersaw(notes, features.spectralComplexity);
 
 **Feature Scoring:**
 Each genre signature has target ranges for:
+
 - BPM
 - Sub-bass energy (dB)
 - Crest factor
@@ -122,12 +124,14 @@ Each genre signature has target ranges for:
 - Kick distortion THD (optional)
 
 Weights applied:
+
 - `sidechainStrength: 0.95` (highest for electronic genres)
 - `bassDecay: 0.85` (second highest)
 - `kickDistortion: 0.6` (for hard/industrial)
 - `rt60: 0.5` (for ambient/dub)
 
 **Genre Boosts:**
+
 - Acid techno: +30% score boost if acid detected
 - Trance/Progressive: +20% score boost if supersaw detected
 
@@ -135,16 +139,16 @@ Weights applied:
 
 ### 3. Specialized Analysis Services
 
-| Service | File | Key Algorithm | Output |
-|---------|------|---------------|--------|
-| **Sidechain Detection** | `sidechainDetection.ts` | Sub-bass envelope modulation analysis | `strength: 0-1`, `hasSidechain: bool` |
-| **Bass Decay Analysis** | `bassAnalysis.ts` | Transient detection + decay measurement | `type: punchy/medium/rolling/sustained` |
-| **Swing Detection** | `bassAnalysis.ts` | Autocorrelation at lag-1 | `swingPercent: 0-50`, `grooveType` |
-| **Acid Detection** | `acidDetection.ts` | Resonance peak + spectral centroid oscillation | `isAcid: bool`, `resonanceLevel` |
-| **Reverb Analysis** | `reverbAnalysis.ts` | Transient decay slope → RT60 estimation | `rt60: seconds`, `isWet: bool` |
-| **Kick Analysis** | `kickAnalysis.ts` | FFT-based THD measurement | `thd: 0-1`, `isDistorted: bool` |
-| **Supersaw Detection** | `supersawDetection.ts` | Pitch bend variance analysis (Basic Pitch) | `voiceCount`, `avgDetuneCents` |
-| **Vocal Detection** | `vocalDetection.ts` | Formant structure + MFCC likelihood | `hasVocals: bool`, `formantStrength` |
+| Service                 | File                    | Key Algorithm                                  | Output                                  |
+| ----------------------- | ----------------------- | ---------------------------------------------- | --------------------------------------- |
+| **Sidechain Detection** | `sidechainDetection.ts` | Sub-bass envelope modulation analysis          | `strength: 0-1`, `hasSidechain: bool`   |
+| **Bass Decay Analysis** | `bassAnalysis.ts`       | Transient detection + decay measurement        | `type: punchy/medium/rolling/sustained` |
+| **Swing Detection**     | `bassAnalysis.ts`       | Autocorrelation at lag-1                       | `swingPercent: 0-50`, `grooveType`      |
+| **Acid Detection**      | `acidDetection.ts`      | Resonance peak + spectral centroid oscillation | `isAcid: bool`, `resonanceLevel`        |
+| **Reverb Analysis**     | `reverbAnalysis.ts`     | Transient decay slope → RT60 estimation        | `rt60: seconds`, `isWet: bool`          |
+| **Kick Analysis**       | `kickAnalysis.ts`       | FFT-based THD measurement                      | `thd: 0-1`, `isDistorted: bool`         |
+| **Supersaw Detection**  | `supersawDetection.ts`  | Pitch bend variance analysis (Basic Pitch)     | `voiceCount`, `avgDetuneCents`          |
+| **Vocal Detection**     | `vocalDetection.ts`     | Formant structure + MFCC likelihood            | `hasVocals: bool`, `formantStrength`    |
 
 ---
 
@@ -161,22 +165,26 @@ export interface GlobalTelemetry {
   key: string;
   groove: string;
   detectedGenre?: string;
-  
+
   // Enhanced classification
   enhancedGenre?: string;
   secondaryGenre?: string | null;
   genreFamily?: 'house' | 'techno' | 'dnb' | 'ambient' | 'trance' | 'dubstep' | 'breaks' | 'other';
-  
+
   // Specialized analysis
   sidechainAnalysis?: { hasSidechain: boolean; strength: number };
-  bassAnalysis?: { decayMs: number; type: 'punchy' | 'medium' | 'rolling' | 'sustained'; transientRatio: number };
+  bassAnalysis?: {
+    decayMs: number;
+    type: 'punchy' | 'medium' | 'rolling' | 'sustained';
+    transientRatio: number;
+  };
   swingAnalysis?: { swingPercent: number; grooveType: string };
   acidAnalysis?: { isAcid: boolean; confidence: number; resonanceLevel: number };
   reverbAnalysis?: { rt60: number; isWet: boolean; tailEnergyRatio: number };
   kickAnalysis?: { isDistorted: boolean; thd: number; harmonicRatio: number };
   supersawAnalysis?: { isSupersaw: boolean; confidence: number; voiceCount: number };
   vocalAnalysis?: { hasVocals: boolean; confidence: number; vocalEnergyRatio: number };
-  
+
   // Beat tracking
   beatPositions?: number[];
   downbeatPosition?: number;
@@ -241,6 +249,7 @@ Renders all telemetry in organized sections:
 - **Genre Classification Summary** at bottom combining all detections
 
 **Visual Design:**
+
 - Color-coded accents matching the analysis type:
   - Blue: Sidechain
   - Green: Bass Decay
@@ -336,6 +345,7 @@ EnhancedAnalysisPanel component
 ### 3. Type Safety
 
 All data is strongly typed through `types.ts` interfaces, ensuring:
+
 - No undefined access errors
 - IDE autocomplete for all properties
 - Compile-time validation of data flow
@@ -345,16 +355,19 @@ All data is strongly typed through `types.ts` interfaces, ensuring:
 ## Testing & Validation
 
 ### Type Safety
+
 ```bash
 pnpm run typecheck  # ✅ Passes
 ```
 
 ### Unit Tests
+
 ```bash
 pnpm test  # ✅ 296/296 tests pass
 ```
 
 ### Test Coverage
+
 - `services/__tests__/` - All core analysis functions tested
 - `__tests__/components/` - UI components tested
 - `__tests__/integration/` - End-to-end flows tested
@@ -363,16 +376,16 @@ pnpm test  # ✅ 296/296 tests pass
 
 ## Performance Characteristics
 
-| Analysis | Execution Time | Blocking? |
-|----------|---------------|-----------|
-| extractAudioFeatures | ~100-300ms | Yes |
-| Essentia.js WASM | ~50-150ms | No (catches errors) |
-| HPSS | ~200-500ms | Yes |
-| Chord Detection | ~100-200ms | Yes |
-| Beat Tracking | ~50-100ms | Yes |
-| Polyphonic Pitch | ~500-1000ms | No (lazy) |
-| classifyGenreEnhanced | ~200-400ms | Yes |
-| **Total** | **~1.2-2.6s** | **Mostly parallel** |
+| Analysis              | Execution Time | Blocking?           |
+| --------------------- | -------------- | ------------------- |
+| extractAudioFeatures  | ~100-300ms     | Yes                 |
+| Essentia.js WASM      | ~50-150ms      | No (catches errors) |
+| HPSS                  | ~200-500ms     | Yes                 |
+| Chord Detection       | ~100-200ms     | Yes                 |
+| Beat Tracking         | ~50-100ms      | Yes                 |
+| Polyphonic Pitch      | ~500-1000ms    | No (lazy)           |
+| classifyGenreEnhanced | ~200-400ms     | Yes                 |
+| **Total**             | **~1.2-2.6s**  | **Mostly parallel** |
 
 ---
 

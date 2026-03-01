@@ -75,22 +75,27 @@ vi.mock('../../services/localProvider', () => {
   return { LocalAnalysisProvider: LocalAnalysisProviderMock };
 });
 
-vi.mock('../../services/ollamaProvider', () => {
-  class OllamaProviderMock {
-    name = 'Local LLM (Ollama)';
-    type = 'ollama' as const;
-    async isAvailable(): Promise<boolean> {
-      return false;
-    }
-    async analyze(): Promise<typeof fixtureBlueprint> {
-      return fixtureBlueprint;
-    }
-    async analyzeAudioBuffer(): Promise<typeof fixtureBlueprint> {
-      return fixtureBlueprint;
-    }
-  }
-
-  return { OllamaProvider: OllamaProviderMock };
+vi.mock('../../services/gemini', () => {
+  return {
+    GeminiProvider: class {
+      name = 'Gemini';
+      type = 'gemini' as const;
+      async isAvailable(): Promise<boolean> {
+        return false;
+      }
+      async analyze(): Promise<typeof fixtureBlueprint> {
+        return fixtureBlueprint;
+      }
+    },
+    GeminiChatService: class {
+      async sendMessage() {
+        return new ReadableStream();
+      }
+      clearHistory() {}
+    },
+    GEMINI_MODELS: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', group: 'stable' }],
+    GEMINI_MODEL_LABELS: { 'gemini-2.5-flash': 'Gemini 2.5 Flash' },
+  };
 });
 
 vi.mock('../../services/audioAnalysis', () => ({
@@ -167,10 +172,10 @@ describe('App integration flow', () => {
   });
 
   it('hydrates provider preference from localStorage', () => {
-    localStorage.setItem('sonic-architect-provider', 'ollama');
+    localStorage.setItem('sonic-architect-provider', 'local');
 
     render(<App />);
-    expect(screen.getByText('Ollama + Local DSP')).toBeInTheDocument();
+    expect(screen.getByText('Local DSP Engine')).toBeInTheDocument();
   });
 
   it('persists provider preference when user changes engine', () => {

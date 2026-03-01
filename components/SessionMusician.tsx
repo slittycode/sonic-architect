@@ -36,8 +36,6 @@ interface SessionMusicianProps {
   fileName: string | null;
   /** Whether polyphonic (Basic Pitch) mode is active */
   polyMode?: boolean;
-  /** Toggle polyphonic mode */
-  onPolyModeChange?: (enabled: boolean) => void;
 }
 
 // ── Grid options ───────────────────────────────────────────────────────────────
@@ -168,7 +166,6 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
   error,
   fileName,
   polyMode = false,
-  onPolyModeChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<PreviewHandle | null>(null);
@@ -345,25 +342,10 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
             Download .mid
           </button>
 
-          {/* Poly/Mono mode toggle */}
-          {onPolyModeChange && (
-            <button
-              onClick={() => onPolyModeChange(!polyMode)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-all border ${
-                polyMode
-                  ? 'bg-amber-800/40 text-amber-200 border-amber-700/40 hover:bg-amber-700/50'
-                  : 'bg-zinc-800/40 text-zinc-500 border-zinc-800 hover:text-zinc-300 hover:bg-zinc-800'
-              }`}
-              title={
-                polyMode
-                  ? 'Polyphonic mode (Basic Pitch) — re-analyze to apply'
-                  : 'Monophonic mode (YIN) — switch to poly for chords/multi-note'
-              }
-            >
-              <Music2 className="w-3.5 h-3.5" />
-              {polyMode ? 'Poly' : 'Mono'}
-            </button>
-          )}
+          {/* Poly mode — coming soon */}
+          <span className="text-[10px] text-zinc-600 px-2 py-1 bg-zinc-900/50 border border-zinc-800 rounded">
+            Poly mode coming soon
+          </span>
 
           {/* Collapse toggle */}
           <button
@@ -411,11 +393,10 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
                 <button
                   key={grid}
                   onClick={() => setQuantizeOptions((prev) => ({ ...prev, grid }))}
-                  className={`px-2.5 py-1 text-xs rounded transition-all ${
-                    quantizeOptions.grid === grid
+                  className={`px-2.5 py-1 text-xs rounded transition-all ${quantizeOptions.grid === grid
                       ? 'bg-violet-700/50 text-violet-200 border border-violet-600/50'
                       : 'bg-zinc-800/40 text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-800'
-                  }`}
+                    }`}
                 >
                   {gridLabel(grid)}
                 </button>

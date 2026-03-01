@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, MessageSquare, Trash2 } from 'lucide-react';
-import { ClaudeChatService } from '../services/chatService';
 import { ReconstructionBlueprint, ProviderType } from '../types';
+import { GeminiChatService } from '../services/gemini';
 
 interface ChatPanelProps {
   blueprint: ReconstructionBlueprint | null;
@@ -22,15 +22,11 @@ interface ChatService {
 
 function providerLabel(providerType: ProviderType | undefined): string {
   if (providerType === 'gemini') return 'Gemini Assistant';
-  if (providerType === 'claude') return 'Claude Assistant';
-  // local / ollama: label reflects cloud enrichment if key present
-  const hasGeminiKey =
-    typeof import.meta.env.VITE_GEMINI_API_KEY === 'string' &&
-    import.meta.env.VITE_GEMINI_API_KEY.length > 0;
-  return hasGeminiKey ? 'Gemini Assistant' : 'Production Assistant';
+  return 'Production Assistant';
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint, providerType }) => {
+  const hasGeminiKey = Boolean(import.meta.env.VITE_GEMINI_API_KEY);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,22 +35,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint, providerType }) => {
   const chatServiceRef = useRef<ChatService | null>(null);
 
   useEffect(() => {
-    const hasGeminiKey =
-      typeof import.meta.env.VITE_GEMINI_API_KEY === 'string' &&
-      import.meta.env.VITE_GEMINI_API_KEY.length > 0;
     const blueprintGetter = blueprint ? () => blueprint : null;
 
     setMessages([]);
     setError(null);
 
-    if (providerType === 'gemini' || (hasGeminiKey && providerType !== 'claude')) {
-      // Lazy-load so geminiService stays in its own chunk (not pulled into main bundle)
-      void import('../services/gemini').then(({ GeminiChatService }) => {
-        chatServiceRef.current = new GeminiChatService(blueprintGetter);
-      });
-    } else {
-      chatServiceRef.current = new ClaudeChatService(blueprintGetter);
-    }
+    // Always use Gemini chat service
+    chatServiceRef.current = new GeminiChatService(blueprintGetter);
   }, [blueprint, providerType]);
 
   useEffect(() => {
@@ -139,51 +126,62 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint, providerType }) => {
       </div>
 
       <div className="h-80 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && !error && (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
-            <MessageSquare className="w-8 h-8 text-zinc-600" />
-            <p className="text-sm text-zinc-500">Ask me anything about your audio analysis.</p>
+        {!hasGeminiKey ? (
+          <div className="flex flex-col items-center justify-center h-full text-center gap-2">
+            <MessageSquare className="w-8 h-8 text-zinc-700" />
+            <p className="text-sm text-zinc-500">Chat requires a Gemini API key.</p>
             <p className="text-xs text-zinc-600">
-              {blueprint
-                ? 'I have access to your reconstruction blueprint.'
-                : 'Upload and analyze audio first to link the blueprint.'}
+              Set <code className="text-zinc-500">VITE_GEMINI_API_KEY</code> in{' '}
+              <code className="text-zinc-500">.env.local</code> to enable.
             </p>
           </div>
+        ) : (
+          <>
+            {messages.length === 0 && !error && (
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
+                <MessageSquare className="w-8 h-8 text-zinc-600" />
+                <p className="text-sm text-zinc-500">Ask me anything about your audio analysis.</p>
+                <p className="text-xs text-zinc-600">
+                  {blueprint
+                    ? 'I have access to your reconstruction blueprint.'
+                    : 'Upload and analyze audio first to link the blueprint.'}
+                </p>
+              </div>
+            )}
+
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-200'}`}
+                >
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-zinc-800 px-3 py-2 rounded-lg flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+                  <span className="text-sm text-zinc-400">Thinking...</span>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="flex justify-start">
+                <div className="bg-red-900/20 border border-red-800 px-3 py-2 rounded-lg text-sm text-red-400">
+                  {error}
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </>
         )}
-
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
-                msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-200'
-              }`}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-zinc-800 px-3 py-2 rounded-lg flex items-center gap-2">
-              <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
-              <span className="text-sm text-zinc-400">Thinking...</span>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="flex justify-start">
-            <div className="bg-red-900/20 border border-red-800 px-3 py-2 rounded-lg text-sm text-red-400">
-              {error}
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       <div className="p-3 border-t border-zinc-800">
@@ -196,12 +194,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ blueprint, providerType }) => {
             placeholder={
               blueprint ? 'Ask about your track...' : 'Upload audio first to enable context'
             }
-            disabled={loading}
+            disabled={loading || !hasGeminiKey}
             className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
-            disabled={loading || !input.trim()}
+            disabled={loading || !input.trim() || !hasGeminiKey}
             aria-label="Send chat message"
             className="p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-md transition-colors"
           >

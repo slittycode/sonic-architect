@@ -1,24 +1,38 @@
 /**
- * Gemini Provider — Sequential 2-Phase Architecture
+ * Gemini Provider — V2 Two-Phase Architecture
  *
- * Phase 1 (with audio): Comprehensive structured audio analysis via
- * AudioAnalysisResult. Feeds all 8 telemetry detector fields.
+ * Phase 1 (audio + hints): Comprehensive structured audio analysis.
+ *   Gemini receives the full audio via Files API + local DSP hints,
+ *   returns GeminiPhase1Response validated by Zod.
  *
- * Phase 2 (text-only, no audio): Ableton device chain generation using
- * Phase 1 results + local DSP telemetry. Reuses parseGeminiEnhancement /
- * mergeGeminiEnhancement unchanged from the original implementation.
+ * Phase 2 (audio + Phase 1 + hints): Refinement pass.
+ *   Gemini listens again with the Phase 1 analysis in context,
+ *   returns GeminiPhase2Additions (mix feedback, corrections, enrichments).
  *
- * Only ONE generateContent call includes inlineData (audio).
+ * Both phases include audio. Files API is used for all uploads.
+ * Pipeline: parallel(upload, baseDSP) → Phase 1 → Phase 2 → assemble → cleanup.
  */
 
 import { GoogleGenAI, FileState } from '@google/genai';
 import type { Part } from '@google/genai';
-import { AnalysisProvider, ReconstructionBlueprint, GlobalTelemetry } from '../../types';
+import type {
+  AnalysisProvider,
+  ReconstructionBlueprint,
+  GlobalTelemetry,
+  LocalDSPHints,
+  MixFeedback,
+  SonicElement,
+  DetectedCharacteristics,
+  GenreAnalysis,
+} from '../../types';
 import { decodeAudioFile, extractAudioFeatures } from '../audioAnalysis';
-import { generateMixReport } from '../mixDoctor';
-import { AudioAnalysisResult, validateAudioAnalysisResult } from './types/analysis';
-import { buildAudioAnalysisPrompt } from './prompts/audioAnalysis';
-import { buildDeviceChainsPrompt } from './prompts/deviceChains';
+import { extractEssentiaFeatures } from '../essentiaFeatures';
+import { separateHarmonicPercussive, wrapAsAudioBuffer } from '../hpss';
+import { detectChords } from '../chordDetection';
+import { phase1Schema, type GeminiPhase1Response } from './schemas/phase1Schema';
+import { phase2Schema, type GeminiPhase2Additions } from './schemas/phase2Schema';
+import { buildPhase1Prompt } from './prompts/phase1Analysis';
+import { buildPhase2Prompt } from './prompts/phase2Refinement';
 
 export type GeminiModelId =
   | 'gemini-2.0-flash'
@@ -49,8 +63,6 @@ export const GEMINI_MODEL_LABELS: Record<GeminiModelId, string> = Object.fromEnt
 ) as Record<GeminiModelId, string>;
 
 const DEFAULT_MODEL: GeminiModelId = 'gemini-2.5-flash';
-/** Files larger than this use the Files API upload instead of base64 inline encoding. */
-const FILES_API_THRESHOLD = 20 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // File reading helpers
@@ -66,30 +78,18 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 /**
- * Build the audio Part for Gemini's generateContent call.
- * Small files (≤ FILES_API_THRESHOLD) are sent inline as base64.
- * Large files are uploaded via the Files API, polled until ACTIVE, and
- * referenced by URI. Returns the uploaded file name for post-analysis cleanup.
+ * Upload to Files API, poll until ACTIVE.
+ * Returns { fileUri, fileName } for the uploaded file.
  */
-async function buildAudioPart(
+async function uploadToFilesAPI(
   ai: GoogleGenAI,
-  file: File,
-): Promise<{ part: Part; uploadedFileName: string | null }> {
-  if (file.size <= FILES_API_THRESHOLD) {
-    const base64 = await readFileAsBase64(file);
-    return {
-      part: { inlineData: { data: base64, mimeType: file.type } },
-      uploadedFileName: null,
-    };
-  }
-
-  // Large file — upload via Files API
+  file: File
+): Promise<{ fileUri: string; fileName: string }> {
   const uploaded = await ai.files.upload({ file, config: { mimeType: file.type } });
   if (!uploaded.uri || !uploaded.name) {
     throw new Error('Gemini file upload returned no URI or name');
   }
 
-  // Poll until server-side processing completes
   let fileInfo = uploaded;
   while (fileInfo.state === FileState.PROCESSING) {
     await new Promise((r) => setTimeout(r, 2000));
@@ -102,110 +102,158 @@ async function buildAudioPart(
     throw new Error('Gemini file processing returned no URI');
   }
 
+  return { fileUri: fileInfo.uri, fileName: uploaded.name };
+}
+
+/**
+ * Build the audio Part — either fileData (from Files API URI) or inline base64.
+ */
+function buildAudioPartFromUri(fileUri: string, mimeType: string): Part {
+  return { fileData: { fileUri, mimeType } };
+}
+
+function buildInlineAudioPart(base64: string, mimeType: string): Part {
+  return { inlineData: { data: base64, mimeType } };
+}
+
+// ---------------------------------------------------------------------------
+// Base DSP — extract LocalDSPHints from audio
+// ---------------------------------------------------------------------------
+
+async function runBaseDSP(audioBuffer: AudioBuffer): Promise<LocalDSPHints> {
+  const features = extractAudioFeatures(audioBuffer);
+
+  // Essentia.js WASM features (non-blocking on failure)
+  const essentiaFeatures = await extractEssentiaFeatures(audioBuffer).catch((err) => {
+    console.warn('[GeminiProvider] Essentia.js unavailable:', err);
+    return null;
+  });
+
+  // HPSS for chord detection
+  const hpss = separateHarmonicPercussive(audioBuffer);
+  const harmonicBuffer = wrapAsAudioBuffer(hpss.harmonic, hpss.sampleRate);
+  const chordResult = detectChords(harmonicBuffer);
+
   return {
-    part: { fileData: { fileUri: fileInfo.uri, mimeType: file.type } },
-    uploadedFileName: uploaded.name,
+    bpm: features.bpm,
+    bpmConfidence: features.bpmConfidence,
+    key: `${features.key.root} ${features.key.scale}`,
+    keyConfidence: features.key.confidence,
+    spectralBands: features.spectralBands,
+    spectralTimeline: features.spectralTimeline ?? { timePoints: [], bands: [] },
+    rmsEnvelope: features.rmsProfile,
+    onsets: Array.from({ length: features.onsetCount }, (_, i) => i),
+    mfcc: features.mfcc ? [features.mfcc] : [],
+    chordProgression: chordResult.chords,
+    ...(essentiaFeatures && {
+      essentiaFeatures: {
+        dissonance: essentiaFeatures.dissonance,
+        hfc: essentiaFeatures.hfc,
+        spectralComplexity: essentiaFeatures.spectralComplexity,
+        zeroCrossingRate: essentiaFeatures.zeroCrossingRate,
+      },
+    }),
+    lufsIntegrated: features.lufsIntegrated,
+    truePeak: features.truePeak,
+    stereoCorrelation: features.stereoCorrelation,
+    stereoWidth: features.stereoWidth,
+    monoCompatible: features.monoCompatible,
+    duration: features.duration,
+    sampleRate: features.sampleRate,
+    channelCount: features.channels,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Enhancement merge helpers (reused from original geminiService)
+// Zod validation with fallback
 // ---------------------------------------------------------------------------
 
-// Enhancement shape — matches Ollama/Claude pattern exactly
-interface GeminiEnhancement {
-  groove?: string;
-  instrumentation?: Array<{
-    element: string;
-    timbre?: string;
-    abletonDevice?: string;
-  }>;
-  fxChain?: Array<{
-    artifact: string;
-    recommendation?: string;
-  }>;
-  secretSauce?: {
-    trick?: string;
-    execution?: string;
-  };
-}
-
-export function parseGeminiEnhancement(raw: string): GeminiEnhancement | null {
-  if (!raw || typeof raw !== 'string') return null;
-  const trimmed = raw
+function parsePhase1Response(raw: string, hints: LocalDSPHints): GeminiPhase1Response {
+  const cleaned = raw
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim();
+
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(trimmed) as GeminiEnhancement;
-    if (parsed && typeof parsed === 'object') return parsed;
-    return null;
+    parsed = JSON.parse(cleaned);
   } catch {
-    return null;
+    // Attempt truncated JSON repair — close open brackets/braces
+    let repaired = cleaned;
+    const opens = (repaired.match(/[{[]/g) || []).length;
+    const closes = (repaired.match(/[}\]]/g) || []).length;
+    for (let i = 0; i < opens - closes; i++) {
+      repaired += repaired.lastIndexOf('[') > repaired.lastIndexOf('{') ? ']' : '}';
+    }
+    parsed = JSON.parse(repaired);
   }
+
+  const result = phase1Schema.safeParse(parsed);
+  if (result.success) return result.data;
+
+  // Partial extraction — use Zod defaults/catches for individual fields
+  console.warn('[GeminiProvider] Phase 1 Zod validation failed, using field-level fallbacks:', result.error.issues.slice(0, 5));
+
+  // Force through with catches (schema has .catch() on every field)
+  const forced = phase1Schema.parse(parsed ?? {});
+  // Override BPM/key with local hints if Gemini returned garbage
+  if (!forced.bpm || forced.bpm === 120) {
+    forced.bpm = hints.bpm;
+    forced.bpmConfidence = hints.bpmConfidence;
+  }
+  if (!forced.key || forced.key === 'C major') {
+    forced.key = hints.key;
+    forced.keyConfidence = hints.keyConfidence;
+  }
+
+  return forced;
 }
 
-export function mergeGeminiEnhancement(
-  blueprint: ReconstructionBlueprint,
-  enhancement: GeminiEnhancement | null
-): ReconstructionBlueprint {
-  if (!enhancement) return blueprint;
+function parsePhase2Response(raw: string): GeminiPhase2Additions {
+  const cleaned = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
 
-  const merged: ReconstructionBlueprint = {
-    ...blueprint,
-    telemetry: { ...blueprint.telemetry },
-    instrumentation: blueprint.instrumentation.map((item) => ({ ...item })),
-    fxChain: blueprint.fxChain.map((item) => ({ ...item })),
-    secretSauce: { ...blueprint.secretSauce },
-    meta: blueprint.meta ? { ...blueprint.meta } : undefined,
-  };
-
-  if (enhancement.groove && typeof enhancement.groove === 'string') {
-    merged.telemetry.groove = enhancement.groove;
-  }
-  if (Array.isArray(enhancement.instrumentation)) {
-    for (const update of enhancement.instrumentation) {
-      if (!update?.element) continue;
-      const idx = merged.instrumentation.findIndex((i) => i.element === update.element);
-      if (idx === -1) continue;
-      if (typeof update.timbre === 'string' && update.timbre.trim())
-        merged.instrumentation[idx].timbre = update.timbre.trim();
-      if (typeof update.abletonDevice === 'string' && update.abletonDevice.trim())
-        merged.instrumentation[idx].abletonDevice = update.abletonDevice.trim();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    let repaired = cleaned;
+    const opens = (repaired.match(/[{[]/g) || []).length;
+    const closes = (repaired.match(/[}\]]/g) || []).length;
+    for (let i = 0; i < opens - closes; i++) {
+      repaired += repaired.lastIndexOf('[') > repaired.lastIndexOf('{') ? ']' : '}';
     }
-  }
-  if (Array.isArray(enhancement.fxChain)) {
-    for (const update of enhancement.fxChain) {
-      if (!update?.artifact) continue;
-      const idx = merged.fxChain.findIndex((f) => f.artifact === update.artifact);
-      if (idx === -1) continue;
-      if (typeof update.recommendation === 'string' && update.recommendation.trim())
-        merged.fxChain[idx].recommendation = update.recommendation.trim();
-    }
-  }
-  if (enhancement.secretSauce) {
-    if (typeof enhancement.secretSauce.trick === 'string' && enhancement.secretSauce.trick.trim())
-      merged.secretSauce.trick = enhancement.secretSauce.trick.trim();
-    if (
-      typeof enhancement.secretSauce.execution === 'string' &&
-      enhancement.secretSauce.execution.trim()
-    )
-      merged.secretSauce.execution = enhancement.secretSauce.execution.trim();
+    parsed = JSON.parse(repaired);
   }
 
-  return merged;
+  const result = phase2Schema.safeParse(parsed);
+  if (result.success) return result.data;
+
+  console.warn('[GeminiProvider] Phase 2 Zod validation failed, using field-level fallbacks:', result.error.issues.slice(0, 5));
+  return phase2Schema.parse(parsed ?? {});
 }
 
 // ---------------------------------------------------------------------------
-// Audio analysis merge — Phase 1 results into blueprint telemetry
-// Conflict resolution: prefer Gemini when it conflicts with local DSP
+// Retry helper
 // ---------------------------------------------------------------------------
 
-/**
- * Derive a genreFamily slug from an open-ended genre string.
- * Maps common genre keywords to the 8 supported families.
- */
+async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.warn(`[GeminiProvider] ${label} failed, retrying once:`, err);
+    return fn();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Genre family derivation
+// ---------------------------------------------------------------------------
+
 function deriveGenreFamily(
   genre: string
 ): GlobalTelemetry['genreFamily'] {
@@ -231,107 +279,187 @@ function deriveGenreFamily(
   return 'other';
 }
 
-/**
- * Merge AudioAnalysisResult into blueprint telemetry.
- * Gemini's values take precedence over local DSP when they conflict,
- * with correction flags set for BPM/key changes.
- */
-export function mergeAudioAnalysis(
-  blueprint: ReconstructionBlueprint,
-  analysis: AudioAnalysisResult | null
+// ---------------------------------------------------------------------------
+// Blueprint assembly
+// ---------------------------------------------------------------------------
+
+function assembleBlueprint(
+  phase1: GeminiPhase1Response,
+  phase2: GeminiPhase2Additions | null,
+  hints: LocalDSPHints,
+  features: { spectralTimeline?: { timePoints: number[]; bands: { name: string; energyDb: number[] }[] }; spectralBands: Array<{ name: string; rangeHz: [number, number]; averageDb: number; peakDb: number; dominance: string }>; mfcc?: number[] },
+  analysisTime: number,
+  modelId: GeminiModelId,
 ): ReconstructionBlueprint {
-  if (!analysis) return blueprint;
+  // Start with Phase 1 as the base
+  let bpm = phase1.bpm;
+  let key = phase1.key;
 
-  const t = { ...blueprint.telemetry };
-
-  // BPM — update with correction flag if changed
-  const gemBpm = String(analysis.bpm.value);
-  if (gemBpm !== t.bpm) {
-    t.localBpmEstimate = t.bpm;
-    t.bpm = gemBpm;
-    t.bpmCorrectedByGemini = true;
+  // Apply Phase 2 corrections if confidence > 0.5
+  if (phase2?.bpmCorrection?.correctedBpm && (phase2.bpmCorrection.confidence ?? 0) > 0.5) {
+    bpm = phase2.bpmCorrection.correctedBpm;
+  }
+  if (phase2?.keyCorrection?.correctedKey && (phase2.keyCorrection.confidence ?? 0) > 0.5) {
+    key = phase2.keyCorrection.correctedKey;
   }
 
-  // Key — combine root + scale, update with correction flag if changed
-  const gemKey = `${analysis.key.root} ${analysis.key.scale}`;
-  if (gemKey !== t.key) {
-    t.localKeyEstimate = t.key;
-    t.key = gemKey;
-    t.keyCorrectedByGemini = true;
-  }
+  // Build telemetry
+  const telemetry: GlobalTelemetry = {
+    bpm: String(bpm),
+    key,
+    groove: phase1.grooveDescription || phase1.groove || '',
+    bpmConfidence: phase1.bpmConfidence,
+    keyConfidence: phase1.keyConfidence,
+    detectedGenre: phase1.genre,
+    enhancedGenre: phase1.genre,
+    secondaryGenre: phase1.subGenre || undefined,
+    genreFamily: deriveGenreFamily(phase1.genre),
 
-  // Genre classification
-  if (analysis.genreAffinity.length > 0) {
-    const primary = analysis.genreAffinity[0].genre;
-    t.enhancedGenre = primary;
-    t.detectedGenre = primary;
-    t.genreFamily = deriveGenreFamily(primary);
-    if (analysis.genreAffinity.length > 1) {
-      t.secondaryGenre = analysis.genreAffinity[1].genre;
-    }
-  }
+    // BPM/key correction flags
+    ...(String(bpm) !== String(hints.bpm) && {
+      bpmCorrectedByGemini: true,
+      localBpmEstimate: String(hints.bpm),
+    }),
+    ...(key !== hints.key && {
+      keyCorrectedByGemini: true,
+      localKeyEstimate: hints.key,
+    }),
 
-  // Presence flags — augment detector telemetry with Gemini's audio perception
-  if (analysis.presenceOf.sidechain) {
-    t.sidechainAnalysis = {
-      hasSidechain: true,
-      strength: t.sidechainAnalysis?.strength ?? 0.7,
+    // V2 fields — type assertions are safe because Zod .catch() guarantees values
+    elements: phase1.elements as SonicElement[],
+    detectedCharacteristics: phase1.detectedCharacteristics as unknown as DetectedCharacteristics,
+    genreAnalysis: phase1.genreAnalysis as unknown as GenreAnalysis,
+    grooveDescription: phase1.grooveDescription,
+    geminiChordProgression: phase1.chordProgression as { chords: { chord: string; startTime: number; duration: number }[]; summary: string },
+
+    // Sidechain from Gemini detection
+    ...(phase1.detectedCharacteristics.sidechain?.present && {
+      sidechainAnalysis: {
+        hasSidechain: true,
+        strength: 0.7,
+      },
+    }),
+
+    // Acid from Gemini detection
+    ...(phase1.detectedCharacteristics.acidResonance?.present && {
+      acidAnalysis: { isAcid: true, confidence: 0.7, resonanceLevel: 0.6 },
+    }),
+
+    // Reverb from Gemini detection
+    ...(phase1.detectedCharacteristics.reverbCharacter?.present && {
+      reverbAnalysis: { isWet: true, rt60: 0, tailEnergyRatio: 0 },
+    }),
+
+    // Verification notes
+    verificationNotes: buildVerificationNotes(hints, bpm, key),
+  };
+
+  // Instrumentation → InstrumentRackElement[]
+  const instrumentation = phase1.instrumentation.map((inst) => ({
+    element: inst.name,
+    timbre: inst.description,
+    frequency: '', // Gemini doesn't return a frequency string per instrument in this shape
+    abletonDevice: inst.abletonDevice,
+  }));
+
+  // Effects → FXChainItem[]
+  const fxChain = phase1.effectsChain.map((fx) => ({
+    artifact: fx.name,
+    recommendation: `${fx.abletonDevice}: ${fx.settings} — ${fx.purpose}`,
+  }));
+
+  // Arrangement → ArrangementSection[]
+  const arrangement = phase1.arrangement.map((s) => ({
+    timeRange: `${formatTime(s.startTime)}–${formatTime(s.endTime)}`,
+    label: s.section.charAt(0).toUpperCase() + s.section.slice(1),
+    description: s.description,
+  }));
+
+  // Secret Sauce
+  const secretSauce = {
+    trick: phase1.secretSauce.technique,
+    execution: `${phase1.secretSauce.description}\n\n${phase1.secretSauce.abletonImplementation}`,
+  };
+
+  // Chord progression from Phase 1
+  const chordProgression = phase1.chordProgression.chords.map((c) => ({
+    timeRange: `${formatTime(c.startTime)}–${formatTime(c.startTime + c.duration)}`,
+    chord: c.chord,
+    root: c.chord.replace(/[^A-Ga-g#b].*/, ''),
+    quality: c.chord.replace(/^[A-Ga-g#b]+/, '') || 'major',
+    confidence: 0.8, // Gemini doesn't return per-chord confidence
+  }));
+
+  // Mix feedback from Phase 2
+  let mixFeedback: MixFeedback | undefined;
+  if (phase2?.mixFeedback) {
+    mixFeedback = {
+      overallAssessment: phase2.mixFeedback.overallBalance,
+      spectralBalance: `Low: ${phase2.mixFeedback.lowEnd}\nMid: ${phase2.mixFeedback.midRange}\nHigh: ${phase2.mixFeedback.highEnd}`,
+      stereoField: phase2.mixFeedback.stereoImage,
+      dynamics: phase2.mixFeedback.dynamics,
+      lowEnd: phase2.mixFeedback.lowEnd,
+      highEnd: phase2.mixFeedback.highEnd,
+      suggestions: phase2.mixFeedback.recommendations,
     };
-  } else if (t.sidechainAnalysis) {
-    // Gemini says no sidechain — override local DSP detection
-    t.sidechainAnalysis = { ...t.sidechainAnalysis, hasSidechain: false };
   }
 
-  if (analysis.presenceOf.acidResonance && t.acidAnalysis) {
-    t.acidAnalysis = { ...t.acidAnalysis, isAcid: true };
-  } else if (!analysis.presenceOf.acidResonance && t.acidAnalysis) {
-    t.acidAnalysis = { ...t.acidAnalysis, isAcid: false };
-  }
+  return {
+    telemetry,
+    arrangement,
+    instrumentation,
+    fxChain:
+      fxChain.length > 0
+        ? fxChain
+        : [
+            {
+              artifact: 'Balanced mix',
+              recommendation:
+                'No specific effects detected. Consider: EQ Eight (gentle cuts), Glue Compressor (2:1), Limiter (-0.3dB ceiling).',
+            },
+          ],
+    secretSauce,
+    chordProgression: chordProgression.length > 0 ? chordProgression : undefined,
+    chordProgressionSummary: phase1.chordProgression.summary || undefined,
+    mfcc: features.mfcc,
+    spectralTimeline: features.spectralTimeline,
+    mixFeedback,
+    geminiPhase1: phase1,
+    geminiPhase2: phase2 ?? undefined,
+    meta: {
+      provider: 'gemini',
+      analysisTime,
+      sampleRate: hints.sampleRate,
+      duration: hints.duration,
+      channels: hints.channelCount,
+      llmEnhanced: true,
+    },
+  };
+}
 
-  if (analysis.presenceOf.distortion && t.kickAnalysis) {
-    t.kickAnalysis = { ...t.kickAnalysis, isDistorted: true };
-  }
-
-  if (analysis.presenceOf.reverb && t.reverbAnalysis) {
-    t.reverbAnalysis = { ...t.reverbAnalysis, isWet: true };
-  }
-
-  // Groove pattern — supplement swingAnalysis if absent
-  if (!t.swingAnalysis && analysis.bpm.groovePattern !== 'straight') {
-    const grooveTypeMap: Record<string, GlobalTelemetry['swingAnalysis'] & object> = {
-      swing: { swingPercent: 15, grooveType: 'slight-swing' },
-      shuffle: { swingPercent: 30, grooveType: 'shuffle' },
-      broken: { swingPercent: 10, grooveType: 'slight-swing' },
-    };
-    const mapped = grooveTypeMap[analysis.bpm.groovePattern];
-    if (mapped) t.swingAnalysis = mapped;
-  }
-
-  // Build verification notes from BPM/key agreement
+function buildVerificationNotes(hints: LocalDSPHints, bpm: number, key: string): string {
   const parts: string[] = [];
-  if (t.bpmCorrectedByGemini) {
-    parts.push(`⚠ BPM: local ${t.localBpmEstimate}, Gemini hears ~${t.bpm}`);
+  if (String(bpm) !== String(hints.bpm)) {
+    parts.push(`⚠ BPM: local ${hints.bpm}, Gemini hears ~${bpm}`);
   } else {
-    parts.push(`✓ BPM ${t.bpm} confirmed`);
+    parts.push(`✓ BPM ${bpm} confirmed`);
   }
-  if (t.keyCorrectedByGemini) {
-    parts.push(`⚠ Key: local ${t.localKeyEstimate}, Gemini hears ${t.key}`);
+  if (key !== hints.key) {
+    parts.push(`⚠ Key: local ${hints.key}, Gemini hears ${key}`);
   } else {
-    parts.push(`✓ Key ${t.key} confirmed`);
+    parts.push(`✓ Key ${key} confirmed`);
   }
-  if (analysis.productionNotes) {
-    parts.push(`— ${analysis.productionNotes}`);
-  }
-  t.verificationNotes = parts.join(' · ');
+  return parts.join(' · ');
+}
 
-  // Store full analysis object for downstream consumers
-  t.geminiAudioAnalysis = analysis;
-
-  return { ...blueprint, telemetry: t };
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 // ---------------------------------------------------------------------------
-// Chat service (reused from original geminiService)
+// Chat service
 // ---------------------------------------------------------------------------
 
 const CHAT_SYSTEM_PROMPT =
@@ -423,7 +551,11 @@ export class GeminiProvider implements AnalysisProvider {
     return typeof key === 'string' && key.length > 0;
   }
 
-  async analyze(file: File): Promise<ReconstructionBlueprint> {
+  async analyze(
+    file: File,
+    _signal?: AbortSignal,
+    onProgress?: (message: string) => void
+  ): Promise<ReconstructionBlueprint> {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error(
@@ -432,135 +564,127 @@ export class GeminiProvider implements AnalysisProvider {
     }
 
     const startTime = performance.now();
-
-    // Step 1 — Local DSP: precise BPM, key, spectrum, chords, 8 detectors
-    const audioBuffer = await decodeAudioFile(file);
-    const { LocalAnalysisProvider } = await import('../localProvider');
-    const localProvider = new LocalAnalysisProvider();
-    const localBlueprint = await localProvider.analyzeAudioBuffer(audioBuffer);
-
-    // Step 2 — Prepare audio for Gemini (inline base64 or Files API upload)
     const ai = new GoogleGenAI({ apiKey });
-    let uploadedFileName: string | null = null;
-    let audioPart: Part;
+    const modelPath = `models/${this.modelId}`;
+
+    // Step 1 — PARALLEL: Files API upload + Base DSP
+    onProgress?.('Uploading audio...');
+    const audioBuffer = await decodeAudioFile(file);
+    onProgress?.('Decoding audio...');
+
+    let fileUri: string | null = null;
+    let fileName: string | null = null;
+    let base64Fallback: string | null = null;
+    let hints: LocalDSPHints;
+
     try {
-      const result = await buildAudioPart(ai, file);
-      audioPart = result.part;
-      uploadedFileName = result.uploadedFileName;
+      const [uploadResult, dspResult] = await Promise.all([
+        uploadToFilesAPI(ai, file),
+        runBaseDSP(audioBuffer),
+      ]);
+      fileUri = uploadResult.fileUri;
+      fileName = uploadResult.fileName;
+      hints = dspResult;
     } catch (err) {
-      console.warn('[GeminiProvider] Audio upload failed, falling back to local-only:', err);
+      // If upload fails, fall back to inline base64 for Phase 1
+      console.warn('[GeminiProvider] Files API upload failed, using inline base64:', err);
+      base64Fallback = await readFileAsBase64(file);
+      hints = await runBaseDSP(audioBuffer);
+    }
+
+    const features = extractAudioFeatures(audioBuffer);
+
+    // Build the audio part for Gemini calls
+    const audioPart: Part = fileUri
+      ? buildAudioPartFromUri(fileUri, file.type)
+      : buildInlineAudioPart(base64Fallback!, file.type);
+
+    // Step 2 — Phase 1: Audio + Hints → GeminiPhase1Response
+    onProgress?.('Analyzing with Gemini (Phase 1)...');
+    let phase1: GeminiPhase1Response;
+    try {
+      phase1 = await withRetry(async () => {
+        const response = await ai.models.generateContent({
+          model: modelPath,
+          contents: [
+            {
+              parts: [
+                audioPart,
+                { text: buildPhase1Prompt(hints) },
+              ],
+            },
+          ],
+          config: { responseMimeType: 'application/json' },
+        });
+        return parsePhase1Response(response.text ?? '{}', hints);
+      }, 'Phase 1');
+    } catch (err) {
+      // Phase 1 failed after retry → fall back to full Local mode
+      console.warn('[GeminiProvider] Phase 1 failed, falling back to Local mode:', err);
+      const { LocalAnalysisProvider } = await import('../localProvider');
+      const localProvider = new LocalAnalysisProvider();
+      const localBlueprint = await localProvider.analyzeAudioBuffer(audioBuffer);
       const analysisTime = Math.round(performance.now() - startTime);
+
+      // Clean up uploaded file (fire-and-forget)
+      if (fileName) {
+        ai.files.delete({ name: fileName }).catch(() => {});
+      }
+
       return {
         ...localBlueprint,
         telemetry: {
           ...localBlueprint.telemetry,
           verificationNotes:
-            'Gemini audio upload failed — local DSP measurements used without cloud enrichment.',
+            'Gemini Phase 1 failed — fell back to full Local DSP analysis.',
         },
         meta: {
           provider: 'gemini',
           analysisTime,
-          sampleRate: localBlueprint.meta?.sampleRate ?? 0,
-          duration: localBlueprint.meta?.duration ?? 0,
-          channels: localBlueprint.meta?.channels ?? 0,
+          sampleRate: features.sampleRate,
+          duration: features.duration,
+          channels: features.channels,
+          llmEnhanced: false,
         },
       };
     }
 
-    const modelPath = `models/${this.modelId}`;
-
-    // -----------------------------------------------------------------------
-    // Phase 1 — Audio analysis (WITH audio file)
-    // Single audio upload: comprehensive structured analysis
-    // -----------------------------------------------------------------------
-    let analysis: AudioAnalysisResult | null = null;
+    // Step 3 — Phase 2: Audio + Phase 1 + Hints → GeminiPhase2Additions
+    onProgress?.('Refining analysis (Phase 2)...');
+    let phase2: GeminiPhase2Additions | null = null;
     try {
-      const phase1Response = await ai.models.generateContent({
-        model: modelPath,
-        contents: [
-          {
-            parts: [
-              audioPart,
-              {
-                text: buildAudioAnalysisPrompt(
-                  localBlueprint.telemetry.bpm,
-                  localBlueprint.telemetry.key,
-                  localBlueprint.chordProgressionSummary
-                ),
-              },
-            ],
-          },
-        ],
-        config: { responseMimeType: 'application/json' },
-      });
-
-      const phase1Text = phase1Response.text ?? '{}';
-      const cleaned = phase1Text
-        .trim()
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-      analysis = validateAudioAnalysisResult(JSON.parse(cleaned));
+      phase2 = await withRetry(async () => {
+        const response = await ai.models.generateContent({
+          model: modelPath,
+          contents: [
+            {
+              parts: [
+                audioPart,
+                { text: buildPhase2Prompt(phase1, hints) },
+              ],
+            },
+          ],
+          config: { responseMimeType: 'application/json' },
+        });
+        return parsePhase2Response(response.text ?? '{}');
+      }, 'Phase 2');
     } catch (err) {
-      console.warn('[GeminiProvider] Phase 1 audio analysis failed:', err);
+      // Phase 2 failed — use Phase 1 results only (still good)
+      console.warn('[GeminiProvider] Phase 2 failed, using Phase 1 results only:', err);
     }
 
-    // Merge Phase 1 analysis into blueprint (telemetry + genre + presence flags)
-    const phase1Blueprint = mergeAudioAnalysis(localBlueprint, analysis);
-
-    // Re-score Mix Doctor with Gemini-detected genre (if available)
-    let mixReport = phase1Blueprint.mixReport;
-    if (analysis?.genreAffinity?.[0]) {
-      const features = extractAudioFeatures(audioBuffer);
-      mixReport = generateMixReport(features, analysis.genreAffinity[0].genre);
-    }
-
-    // -----------------------------------------------------------------------
-    // Phase 2 — Device chain generation (TEXT ONLY — no audio)
-    // Uses Phase 1 analysis + local DSP telemetry as rich context
-    // -----------------------------------------------------------------------
-    const phase2Blueprint: ReconstructionBlueprint = { ...phase1Blueprint, mixReport };
-    let finalBlueprint: ReconstructionBlueprint = phase2Blueprint;
-
-    try {
-      const phase2Response = await ai.models.generateContent({
-        model: modelPath,
-        contents: [
-          {
-            parts: [
-              {
-                text: buildDeviceChainsPrompt(phase2Blueprint, analysis),
-              },
-            ],
-          },
-        ],
-        config: { responseMimeType: 'application/json' },
-      });
-
-      const enhancement = parseGeminiEnhancement(phase2Response.text ?? '');
-      finalBlueprint = mergeGeminiEnhancement(phase2Blueprint, enhancement);
-    } catch (err) {
-      console.warn('[GeminiProvider] Phase 2 device chain generation failed:', err);
-    }
-
+    // Step 4 — Assemble blueprint
+    onProgress?.('Building blueprint...');
     const analysisTime = Math.round(performance.now() - startTime);
+    const blueprint = assembleBlueprint(phase1, phase2, hints, features, analysisTime, this.modelId);
 
-    // Clean up uploaded file (fire-and-forget)
-    if (uploadedFileName) {
-      ai.files.delete({ name: uploadedFileName }).catch((err) => {
+    // Step 5 — Clean up uploaded file (fire-and-forget)
+    if (fileName) {
+      ai.files.delete({ name: fileName }).catch((err) => {
         console.warn('[GeminiProvider] Failed to delete uploaded file:', err);
       });
     }
 
-    return {
-      ...finalBlueprint,
-      meta: {
-        provider: 'gemini',
-        analysisTime,
-        sampleRate: localBlueprint.meta?.sampleRate ?? 0,
-        duration: localBlueprint.meta?.duration ?? 0,
-        channels: localBlueprint.meta?.channels ?? 0,
-      },
-    };
+    return blueprint;
   }
 }

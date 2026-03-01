@@ -3,7 +3,7 @@
  *
  * Expands coverage to 25+ electronic subgenres using multi-feature analysis:
  * - BPM and rhythmic features
- * - Spectral characteristics  
+ * - Spectral characteristics
  * - Dynamic features (crest factor, sidechain, bass decay)
  * - Stereo field analysis
  *
@@ -544,14 +544,20 @@ export async function classifyGenreEnhanced(
     ]);
 
   // Supersaw detection (requires notes from Basic Pitch)
-  const supersawResult = notes && notes.length > 0
-    ? detectSupersaw(notes, features.spectralComplexity)
-    : { isSupersaw: false, confidence: 0, voiceCount: 0, avgDetuneCents: 0, spectralComplexity: 0 };
+  const supersawResult =
+    notes && notes.length > 0
+      ? detectSupersaw(notes, features.spectralComplexity)
+      : {
+          isSupersaw: false,
+          confidence: 0,
+          voiceCount: 0,
+          avgDetuneCents: 0,
+          spectralComplexity: 0,
+        };
 
   // Swing detection if beat positions available
-  const swingResult = beatPositions && beatPositions.length >= 8
-    ? detectSwing(beatPositions)
-    : null;
+  const swingResult =
+    beatPositions && beatPositions.length >= 8 ? detectSwing(beatPositions) : null;
 
   const subBassDb = getSubBassDb(features.spectralBands);
 
@@ -594,9 +600,10 @@ export async function classifyGenreEnhanced(
 
     const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
 
-    let weightedScore = Object.keys(weights).reduce((sum, key) => {
-      return sum + (rawScores[key] ?? 0) * weights[key];
-    }, 0) / totalWeight;
+    let weightedScore =
+      Object.keys(weights).reduce((sum, key) => {
+        return sum + (rawScores[key] ?? 0) * weights[key];
+      }, 0) / totalWeight;
 
     // Acid boost: if acid-techno signature and acid detected, boost score
     if (sig.id === 'acid-techno' && acidResult.isAcid) {
@@ -635,7 +642,10 @@ export async function classifyGenreEnhanced(
     allScores: scores.map((s) => ({
       genre: s.genre,
       score: Math.round(s.score * 100) / 100,
-      confidence: Math.max(0, Math.min(1, Math.round(s.score * (1 - (primary.score - s.score)) * 100) / 100)),
+      confidence: Math.max(
+        0,
+        Math.min(1, Math.round(s.score * (1 - (primary.score - s.score)) * 100) / 100)
+      ),
     })),
     bassAnalysis: bassResult,
     sidechainAnalysis: {
@@ -708,11 +718,7 @@ export function classifyGenreQuick(features: AudioFeatures): GenreClassification
     const centroidScore = rangeScore(features.spectralCentroidMean, sig.spectralCentroid, 0.0003);
 
     scores[sig.id] =
-      bpmScore * 0.30 +
-      subScore * 0.25 +
-      crestScore * 0.20 +
-      onsetScore * 0.15 +
-      centroidScore * 0.10;
+      bpmScore * 0.3 + subScore * 0.25 + crestScore * 0.2 + onsetScore * 0.15 + centroidScore * 0.1;
   }
 
   let bestId = 'edm';
@@ -749,12 +755,12 @@ export function isEnhancedGenre(genreId: string): boolean {
 /** Map legacy genre IDs to recommended enhanced subgenres */
 export function suggestEnhancedGenre(legacyGenre: string): string[] {
   const mapping: Record<string, string[]> = {
-    'edm': ['progressive-house', 'classic-house'],
-    'techno': ['driving-techno', 'melodic-techno', 'minimal-techno'],
-    'house': ['classic-house', 'deep-house', 'tech-house'],
-    'ambient': ['ambient-drone', 'ambient-techno', 'dub-techno'],
-    'dnb': ['drum-bass', 'neurofunk'],
-    'garage': ['uk-garage', 'bassline'],
+    edm: ['progressive-house', 'classic-house'],
+    techno: ['driving-techno', 'melodic-techno', 'minimal-techno'],
+    house: ['classic-house', 'deep-house', 'tech-house'],
+    ambient: ['ambient-drone', 'ambient-techno', 'dub-techno'],
+    dnb: ['drum-bass', 'neurofunk'],
+    garage: ['uk-garage', 'bassline'],
   };
   return mapping[legacyGenre] || [legacyGenre];
 }

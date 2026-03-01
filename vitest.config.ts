@@ -8,14 +8,17 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
+    exclude: ['archive/**', 'node_modules/**'],
+    // Use empty string so provider defaults to 'local' and no real API calls are made.
+    // Uses env (not define) so vi.stubEnv() can override in individual tests.
+    env: {
+      VITE_GEMINI_API_KEY: '',
+    },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
     },
   },
-  define: {
-    // Use empty string in tests so provider defaults to 'local' and no real API calls are made.
-    'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(''),
-  },
+  define: {},
 });

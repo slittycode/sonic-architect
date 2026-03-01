@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatPanel from '../../components/ChatPanel';
@@ -9,20 +9,14 @@ const { sendMessageMock, clearHistoryMock } = vi.hoisted(() => ({
   clearHistoryMock: vi.fn(),
 }));
 
-vi.mock('../../services/chatService', () => ({
-  ClaudeChatService: class ClaudeChatServiceMock {
-    sendMessage = sendMessageMock;
-    clearHistory = clearHistoryMock;
-  },
-}));
-
 vi.mock('../../services/gemini', () => ({
   GeminiChatService: class GeminiChatServiceMock {
     sendMessage = sendMessageMock;
     clearHistory = clearHistoryMock;
   },
-  parseGeminiEnhancement: vi.fn(),
-  mergeGeminiEnhancement: vi.fn(),
+  GeminiProvider: class {},
+  GEMINI_MODELS: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', group: 'stable' }],
+  GEMINI_MODEL_LABELS: { 'gemini-2.5-flash': 'Gemini 2.5 Flash' },
 }));
 
 function makeBlueprint(): ReconstructionBlueprint {
@@ -60,6 +54,21 @@ function createStringStream(chunks: string[]): ReadableStream<string> {
 describe('ChatPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Stub VITE_GEMINI_API_KEY so the chat UI is enabled (not in disabled state)
+    vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('shows disabled state when no Gemini API key is set', () => {
+    vi.stubEnv('VITE_GEMINI_API_KEY', '');
+
+    render(<ChatPanel blueprint={makeBlueprint()} />);
+
+    expect(screen.getByText('Chat requires a Gemini API key.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeDisabled();
   });
 
   it('renders empty state and blueprint context badge', () => {

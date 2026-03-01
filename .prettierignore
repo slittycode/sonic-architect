@@ -1,1 +1,8 @@
 pnpm-lock.yaml
+node_modules
+dist
+.pnpm-store
+archive
+skills
+.playwright-cli
+.cursor

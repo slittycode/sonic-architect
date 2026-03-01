@@ -33,10 +33,7 @@ const HOP_SIZE = 256; // Fine resolution for transient detection
 /**
  * Analyze kick drum distortion characteristics.
  */
-export function analyzeKickDistortion(
-  audioBuffer: AudioBuffer,
-  bpm: number
-): KickAnalysisResult {
+export function analyzeKickDistortion(audioBuffer: AudioBuffer, bpm: number): KickAnalysisResult {
   const sampleRate = audioBuffer.sampleRate;
   const channelData = audioBuffer.getChannelData(0);
 
@@ -59,11 +56,7 @@ export function analyzeKickDistortion(
   const fundamentals: number[] = [];
 
   for (const transient of kickTransients) {
-    const analysis = analyzeKickFrame(
-      channelData,
-      transient.sampleIndex,
-      sampleRate
-    );
+    const analysis = analyzeKickFrame(channelData, transient.sampleIndex, sampleRate);
     thdValues.push(analysis.thd);
     harmonicRatios.push(analysis.harmonicRatio);
     fundamentals.push(analysis.fundamentalHz);
@@ -71,10 +64,8 @@ export function analyzeKickDistortion(
 
   // Average across all kicks
   const avgThd = thdValues.reduce((a, b) => a + b, 0) / thdValues.length;
-  const avgHarmonicRatio =
-    harmonicRatios.reduce((a, b) => a + b, 0) / harmonicRatios.length;
-  const avgFundamental =
-    fundamentals.reduce((a, b) => a + b, 0) / fundamentals.length;
+  const avgHarmonicRatio = harmonicRatios.reduce((a, b) => a + b, 0) / harmonicRatios.length;
+  const avgFundamental = fundamentals.reduce((a, b) => a + b, 0) / fundamentals.length;
 
   // Distorted if THD > 15% or harmonic ratio < 0.5 (more inharmonic content)
   const isDistorted = avgThd > 0.15 || avgHarmonicRatio < 0.5;
@@ -143,25 +134,15 @@ function detectKickTransients(
 /**
  * Build energy envelope in kick frequency range (30-120Hz).
  */
-function buildKickEnvelope(
-  channelData: Float32Array,
-  sampleRate: number
-): number[] {
+function buildKickEnvelope(channelData: Float32Array, sampleRate: number): number[] {
   const envelope: number[] = [];
   const real = new Float32Array(FRAME_SIZE);
   const imag = new Float32Array(FRAME_SIZE);
 
   const lowBin = Math.floor((KICK_LOW_HZ * FRAME_SIZE) / sampleRate);
-  const highBin = Math.min(
-    Math.ceil((KICK_HIGH_HZ * FRAME_SIZE) / sampleRate),
-    FRAME_SIZE / 2 - 1
-  );
+  const highBin = Math.min(Math.ceil((KICK_HIGH_HZ * FRAME_SIZE) / sampleRate), FRAME_SIZE / 2 - 1);
 
-  for (
-    let offset = 0;
-    offset + FRAME_SIZE <= channelData.length;
-    offset += HOP_SIZE
-  ) {
+  for (let offset = 0; offset + FRAME_SIZE <= channelData.length; offset += HOP_SIZE) {
     // Apply window and FFT
     for (let i = 0; i < FRAME_SIZE; i++) {
       real[i] = channelData[offset + i] ?? 0;
@@ -221,10 +202,7 @@ function analyzeKickFrame(
 
   // Find fundamental frequency (strongest peak in 30-120Hz range)
   const lowBin = Math.floor((KICK_LOW_HZ * FRAME_SIZE) / sampleRate);
-  const highBin = Math.min(
-    Math.ceil((KICK_HIGH_HZ * FRAME_SIZE) / sampleRate),
-    FRAME_SIZE / 2 - 1
-  );
+  const highBin = Math.min(Math.ceil((KICK_HIGH_HZ * FRAME_SIZE) / sampleRate), FRAME_SIZE / 2 - 1);
 
   let maxMagnitude = 0;
   let fundamentalBin = lowBin;
@@ -245,21 +223,17 @@ function analyzeKickFrame(
   let harmonicPower = 0;
 
   // Check harmonics up to 10th harmonic or Nyquist
-  const maxHarmonic = Math.min(10, Math.floor((sampleRate / 2) / fundamentalHz));
+  const maxHarmonic = Math.min(10, Math.floor(sampleRate / 2 / fundamentalHz));
 
   for (let h = 2; h <= maxHarmonic; h++) {
     const harmonicBin = Math.round(fundamentalBin * h);
     if (harmonicBin < FRAME_SIZE / 2) {
-      const harmonicMagnitude = Math.hypot(
-        real[harmonicBin],
-        imag[harmonicBin]
-      );
+      const harmonicMagnitude = Math.hypot(real[harmonicBin], imag[harmonicBin]);
       harmonicPower += harmonicMagnitude * harmonicMagnitude;
     }
   }
 
-  const thd =
-    fundamentalPower > 0 ? Math.sqrt(harmonicPower) / Math.sqrt(fundamentalPower) : 0;
+  const thd = fundamentalPower > 0 ? Math.sqrt(harmonicPower) / Math.sqrt(fundamentalPower) : 0;
 
   // Calculate harmonic vs inharmonic ratio
   // Harmonic content: energy at harmonic frequencies
@@ -272,11 +246,7 @@ function analyzeKickFrame(
     const freq = (k * sampleRate) / FRAME_SIZE;
 
     // Check if this bin is close to a harmonic
-    const isHarmonic = isCloseToHarmonic(
-      freq,
-      fundamentalHz,
-      sampleRate / FRAME_SIZE
-    );
+    const isHarmonic = isCloseToHarmonic(freq, fundamentalHz, sampleRate / FRAME_SIZE);
 
     if (isHarmonic) {
       harmonicEnergy += magnitude * magnitude;
@@ -298,11 +268,7 @@ function analyzeKickFrame(
 /**
  * Check if a frequency is close to any harmonic of the fundamental.
  */
-function isCloseToHarmonic(
-  freq: number,
-  fundamentalHz: number,
-  binWidth: number
-): boolean {
+function isCloseToHarmonic(freq: number, fundamentalHz: number, binWidth: number): boolean {
   const harmonicTolerance = binWidth * 1.5; // 1.5 bins tolerance
 
   for (let h = 1; h <= 10; h++) {

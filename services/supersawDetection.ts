@@ -77,14 +77,10 @@ export function detectSupersaw(
 
   // Calculate supersaw indicators
   const avgVoiceCount =
-    voiceGroups.length > 0
-      ? voiceGroups.reduce((a, b) => a + b.length, 0) / voiceGroups.length
-      : 0;
+    voiceGroups.length > 0 ? voiceGroups.reduce((a, b) => a + b.length, 0) / voiceGroups.length : 0;
 
   const avgDetuneCents =
-    detuneValues.length > 0
-      ? detuneValues.reduce((a, b) => a + b, 0) / detuneValues.length
-      : 0;
+    detuneValues.length > 0 ? detuneValues.reduce((a, b) => a + b, 0) / detuneValues.length : 0;
 
   // Supersaw scoring
   // - Voice count: 5-9 voices is typical supersaw
@@ -93,20 +89,13 @@ export function detectSupersaw(
 
   const voiceCountScore = Math.min(1, Math.max(0, (avgVoiceCount - 3) / 4)); // 3-7 voices = 0-1
   const detuneScore = calculateDetuneScore(avgDetuneCents);
-  const consistencyScore =
-    voiceGroups.length > 2
-      ? Math.min(1, voiceGroups.length / 5)
-      : 0;
+  const consistencyScore = voiceGroups.length > 2 ? Math.min(1, voiceGroups.length / 5) : 0;
 
   // Spectral complexity boost (supersaw has rich harmonic content)
-  const complexityBoost =
-    spectralComplexity && spectralComplexity > 5 ? 0.1 : 0;
+  const complexityBoost = spectralComplexity && spectralComplexity > 5 ? 0.1 : 0;
 
   const confidence =
-    voiceCountScore * 0.35 +
-    detuneScore * 0.35 +
-    consistencyScore * 0.3 +
-    complexityBoost;
+    voiceCountScore * 0.35 + detuneScore * 0.35 + consistencyScore * 0.3 + complexityBoost;
 
   const isSupersaw = confidence > 0.4 && avgVoiceCount >= 3;
 

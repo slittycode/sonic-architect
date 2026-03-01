@@ -75,11 +75,35 @@ describe('mixDoctor', () => {
       spectralBands: [
         { name: 'Sub Bass', rangeHz: [20, 80], averageDb: -9, peakDb: -5, dominance: 'dominant' },
         { name: 'Low Bass', rangeHz: [80, 250], averageDb: -11, peakDb: -8, dominance: 'dominant' },
-        { name: 'Low Mids', rangeHz: [250, 500], averageDb: -19, peakDb: -14, dominance: 'present' },
+        {
+          name: 'Low Mids',
+          rangeHz: [250, 500],
+          averageDb: -19,
+          peakDb: -14,
+          dominance: 'present',
+        },
         { name: 'Mids', rangeHz: [500, 2000], averageDb: -15, peakDb: -10, dominance: 'dominant' },
-        { name: 'Upper Mids', rangeHz: [2000, 5000], averageDb: -17, peakDb: -12, dominance: 'present' },
-        { name: 'Highs', rangeHz: [5000, 10000], averageDb: -19, peakDb: -14, dominance: 'present' },
-        { name: 'Brilliance', rangeHz: [10000, 20000], averageDb: -23, peakDb: -18, dominance: 'present' },
+        {
+          name: 'Upper Mids',
+          rangeHz: [2000, 5000],
+          averageDb: -17,
+          peakDb: -12,
+          dominance: 'present',
+        },
+        {
+          name: 'Highs',
+          rangeHz: [5000, 10000],
+          averageDb: -19,
+          peakDb: -14,
+          dominance: 'present',
+        },
+        {
+          name: 'Brilliance',
+          rangeHz: [10000, 20000],
+          averageDb: -23,
+          peakDb: -18,
+          dominance: 'present',
+        },
       ],
     };
 
@@ -93,11 +117,35 @@ describe('mixDoctor', () => {
       spectralBands: [
         { name: 'Sub Bass', rangeHz: [20, 80], averageDb: -11, peakDb: -5, dominance: 'dominant' },
         { name: 'Low Bass', rangeHz: [80, 250], averageDb: -14, peakDb: -8, dominance: 'dominant' },
-        { name: 'Low Mids', rangeHz: [250, 500], averageDb: -22, peakDb: -16, dominance: 'present' },
+        {
+          name: 'Low Mids',
+          rangeHz: [250, 500],
+          averageDb: -22,
+          peakDb: -16,
+          dominance: 'present',
+        },
         { name: 'Mids', rangeHz: [500, 2000], averageDb: -18, peakDb: -12, dominance: 'present' },
-        { name: 'Upper Mids', rangeHz: [2000, 5000], averageDb: -20, peakDb: -14, dominance: 'present' },
-        { name: 'Highs', rangeHz: [5000, 10000], averageDb: -23, peakDb: -17, dominance: 'present' },
-        { name: 'Brilliance', rangeHz: [10000, 20000], averageDb: -27, peakDb: -20, dominance: 'present' },
+        {
+          name: 'Upper Mids',
+          rangeHz: [2000, 5000],
+          averageDb: -20,
+          peakDb: -14,
+          dominance: 'present',
+        },
+        {
+          name: 'Highs',
+          rangeHz: [5000, 10000],
+          averageDb: -23,
+          peakDb: -17,
+          dominance: 'present',
+        },
+        {
+          name: 'Brilliance',
+          rangeHz: [10000, 20000],
+          averageDb: -27,
+          peakDb: -20,
+          dominance: 'present',
+        },
       ],
     };
 
@@ -113,11 +161,35 @@ describe('mixDoctor', () => {
         { name: 'Sub Bass', rangeHz: [20, 80], averageDb: -5, peakDb: -2, dominance: 'dominant' },
         // Rest at optimal
         { name: 'Low Bass', rangeHz: [80, 250], averageDb: -14, peakDb: -8, dominance: 'dominant' },
-        { name: 'Low Mids', rangeHz: [250, 500], averageDb: -22, peakDb: -16, dominance: 'present' },
+        {
+          name: 'Low Mids',
+          rangeHz: [250, 500],
+          averageDb: -22,
+          peakDb: -16,
+          dominance: 'present',
+        },
         { name: 'Mids', rangeHz: [500, 2000], averageDb: -18, peakDb: -12, dominance: 'present' },
-        { name: 'Upper Mids', rangeHz: [2000, 5000], averageDb: -20, peakDb: -14, dominance: 'present' },
-        { name: 'Highs', rangeHz: [5000, 10000], averageDb: -23, peakDb: -17, dominance: 'present' },
-        { name: 'Brilliance', rangeHz: [10000, 20000], averageDb: -27, peakDb: -20, dominance: 'present' },
+        {
+          name: 'Upper Mids',
+          rangeHz: [2000, 5000],
+          averageDb: -20,
+          peakDb: -14,
+          dominance: 'present',
+        },
+        {
+          name: 'Highs',
+          rangeHz: [5000, 10000],
+          averageDb: -23,
+          peakDb: -17,
+          dominance: 'present',
+        },
+        {
+          name: 'Brilliance',
+          rangeHz: [10000, 20000],
+          averageDb: -27,
+          peakDb: -20,
+          dominance: 'present',
+        },
       ],
     };
 

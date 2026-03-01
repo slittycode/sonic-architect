@@ -23,15 +23,15 @@ async function getEssentia() {
   if (essentiaInstance) return essentiaInstance;
   // Dynamic import to keep WASM out of the initial bundle
   const essentiaModule = await import('essentia.js');
-  
+
   // Handle both ES module and CommonJS module structures
   const Essentia = essentiaModule.Essentia || essentiaModule.default;
   const EssentiaWASM = essentiaModule.EssentiaWASM;
-  
+
   if (!Essentia || !EssentiaWASM) {
     throw new Error('Failed to load Essentia.js modules');
   }
-  
+
   essentiaInstance = new Essentia(EssentiaWASM);
   return essentiaInstance;
 }
@@ -46,7 +46,7 @@ export async function extractEssentiaFeatures(
     console.warn('[Essentia] Failed to load, returning zero features:', err);
     return { dissonance: 0, hfc: 0, spectralComplexity: 0, zeroCrossingRate: 0 };
   }
-  
+
   try {
     const channelData = audioBuffer.getChannelData(0);
     const frameSize = 2048;

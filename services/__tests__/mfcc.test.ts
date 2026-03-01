@@ -114,9 +114,10 @@ describe('MFCC extraction', () => {
 
     // Stddev should be small relative to mean magnitude for a stationary tone
     for (let i = 0; i < 13; i++) {
-      const ratio = Math.abs(result.mean[i]) > 0.01
-        ? result.stddev[i] / Math.abs(result.mean[i])
-        : result.stddev[i];
+      const ratio =
+        Math.abs(result.mean[i]) > 0.01
+          ? result.stddev[i] / Math.abs(result.mean[i])
+          : result.stddev[i];
       // Variation should be less than 50% of mean (generous for FFT frame effects)
       expect(ratio).toBeLessThan(0.5);
     }

@@ -76,8 +76,26 @@ describe('detectSupersaw', () => {
 
   it('returns isSupersaw: false when fewer than 3 notes with pitch bend', () => {
     const twoNotes: DetectedNote[] = [
-      { midi: 60, name: 'C4', frequency: 261.63, startTime: 0, duration: 1, velocity: 64, confidence: 0.8, pitchBend: [0.1, -0.1] },
-      { midi: 62, name: 'D4', frequency: 293.66, startTime: 0, duration: 1, velocity: 64, confidence: 0.8, pitchBend: [0.1, -0.1] },
+      {
+        midi: 60,
+        name: 'C4',
+        frequency: 261.63,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+        pitchBend: [0.1, -0.1],
+      },
+      {
+        midi: 62,
+        name: 'D4',
+        frequency: 293.66,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+        pitchBend: [0.1, -0.1],
+      },
     ];
     const result = detectSupersaw(twoNotes);
     expect(result.isSupersaw).toBe(false);
@@ -85,10 +103,42 @@ describe('detectSupersaw', () => {
 
   it('returns isSupersaw: false for notes without pitch bend data', () => {
     const notesNoBend: DetectedNote[] = [
-      { midi: 60, name: 'C4', frequency: 261.63, startTime: 0, duration: 1, velocity: 64, confidence: 0.8 },
-      { midi: 62, name: 'D4', frequency: 293.66, startTime: 0, duration: 1, velocity: 64, confidence: 0.8 },
-      { midi: 64, name: 'E4', frequency: 329.63, startTime: 0, duration: 1, velocity: 64, confidence: 0.8 },
-      { midi: 67, name: 'G4', frequency: 392.0, startTime: 0, duration: 1, velocity: 64, confidence: 0.8 },
+      {
+        midi: 60,
+        name: 'C4',
+        frequency: 261.63,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+      },
+      {
+        midi: 62,
+        name: 'D4',
+        frequency: 293.66,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+      },
+      {
+        midi: 64,
+        name: 'E4',
+        frequency: 329.63,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+      },
+      {
+        midi: 67,
+        name: 'G4',
+        frequency: 392.0,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+      },
     ];
     const result = detectSupersaw(notesNoBend);
     expect(result.isSupersaw).toBe(false);
@@ -123,9 +173,36 @@ describe('detectSupersaw', () => {
   it('returns higher voiceCount for multi-voice notes than single-voice notes', () => {
     const multiVoice = createSupersawNotes();
     const singleVoice: DetectedNote[] = [
-      { midi: 60, name: 'C4', frequency: 261.63, startTime: 0, duration: 1, velocity: 64, confidence: 0.8, pitchBend: new Array(30).fill(0.0) },
-      { midi: 62, name: 'D4', frequency: 293.66, startTime: 0, duration: 1, velocity: 64, confidence: 0.8, pitchBend: new Array(30).fill(0.0) },
-      { midi: 64, name: 'E4', frequency: 329.63, startTime: 0, duration: 1, velocity: 64, confidence: 0.8, pitchBend: new Array(30).fill(0.0) },
+      {
+        midi: 60,
+        name: 'C4',
+        frequency: 261.63,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+        pitchBend: new Array(30).fill(0.0),
+      },
+      {
+        midi: 62,
+        name: 'D4',
+        frequency: 293.66,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+        pitchBend: new Array(30).fill(0.0),
+      },
+      {
+        midi: 64,
+        name: 'E4',
+        frequency: 329.63,
+        startTime: 0,
+        duration: 1,
+        velocity: 64,
+        confidence: 0.8,
+        pitchBend: new Array(30).fill(0.0),
+      },
     ];
 
     const multiResult = detectSupersaw(multiVoice);

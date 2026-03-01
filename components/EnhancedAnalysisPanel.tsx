@@ -67,7 +67,9 @@ const AnalysisCard: React.FC<{
   };
 
   return (
-    <div className={`p-4 rounded-lg border ${accentClasses[accent]} transition-all hover:border-opacity-50`}>
+    <div
+      className={`p-4 rounded-lg border ${accentClasses[accent]} transition-all hover:border-opacity-50`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={iconColors[accent]}>{icon}</div>
@@ -76,7 +78,9 @@ const AnalysisCard: React.FC<{
         {confidence !== undefined && (
           <div className="flex items-center gap-1">
             <Gauge className="w-3 h-3 text-zinc-500" />
-            <span className="text-[10px] font-mono text-zinc-400">{Math.round(confidence * 100)}%</span>
+            <span className="text-[10px] font-mono text-zinc-400">
+              {Math.round(confidence * 100)}%
+            </span>
           </div>
         )}
       </div>
@@ -143,11 +147,7 @@ const StatusBadge: React.FC<{
         active ? colors[activeColor] : 'bg-zinc-800 text-zinc-500 border-zinc-700'
       }`}
     >
-      {active ? (
-        <CheckCircle2 className="w-3 h-3" />
-      ) : (
-        <AlertTriangle className="w-3 h-3" />
-      )}
+      {active ? <CheckCircle2 className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
       {active ? activeText : inactiveText}
     </div>
   );
@@ -318,14 +318,15 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                     color="bg-pink-500"
                   />
                   <p className="text-[10px] text-zinc-500 leading-relaxed">
-                    TB-303-style acid bassline detected. Characteristic resonant filter sweeps and 16th-note patterns.
-                    Typical of acid techno and acid house.
+                    TB-303-style acid bassline detected. Characteristic resonant filter sweeps and
+                    16th-note patterns. Typical of acid techno and acid house.
                   </p>
                 </>
               )}
               {!telemetry.acidAnalysis.isAcid && (
                 <p className="text-[10px] text-zinc-500 leading-relaxed">
-                  No TB-303 acid pattern detected. Bass content appears to be standard synthesis or samples.
+                  No TB-303 acid pattern detected. Bass content appears to be standard synthesis or
+                  samples.
                 </p>
               )}
             </div>
@@ -334,7 +335,11 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
 
         {/* Reverb Tail Analysis */}
         {telemetry.reverbAnalysis && (
-          <AnalysisCard icon={<Droplets className="w-4 h-4" />} title="Reverb Tail (RT60)" accent="cyan">
+          <AnalysisCard
+            icon={<Droplets className="w-4 h-4" />}
+            title="Reverb Tail (RT60)"
+            accent="cyan"
+          >
             <div className="space-y-3">
               <StatusBadge
                 active={telemetry.reverbAnalysis.isWet}
@@ -404,7 +409,11 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
 
         {/* Supersaw Detection */}
         {telemetry.supersawAnalysis && (
-          <AnalysisCard icon={<Guitar className="w-4 h-4" />} title="Supersaw Detection" accent="indigo">
+          <AnalysisCard
+            icon={<Guitar className="w-4 h-4" />}
+            title="Supersaw Detection"
+            accent="indigo"
+          >
             <div className="space-y-3">
               <StatusBadge
                 active={telemetry.supersawAnalysis.isSupersaw}
@@ -417,17 +426,21 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                   <div className="flex items-center gap-2 text-[10px] text-zinc-400">
                     <span>~{telemetry.supersawAnalysis.voiceCount} voices</span>
                     <span>•</span>
-                    <span>{Math.round(telemetry.supersawAnalysis.confidence * 100)}% confidence</span>
+                    <span>
+                      {Math.round(telemetry.supersawAnalysis.confidence * 100)}% confidence
+                    </span>
                   </div>
                   <p className="text-[10px] text-zinc-500 leading-relaxed">
-                    Supersaw synthesizer pattern detected. Multiple detuned sawtooth waves creating a thick, rich sound.
-                    Characteristic of trance, progressive house, and big room EDM.
+                    Supersaw synthesizer pattern detected. Multiple detuned sawtooth waves creating
+                    a thick, rich sound. Characteristic of trance, progressive house, and big room
+                    EDM.
                   </p>
                 </>
               )}
               {!telemetry.supersawAnalysis.isSupersaw && (
                 <p className="text-[10px] text-zinc-500 leading-relaxed">
-                  No supersaw pattern detected. Lead/synth content appears to use other synthesis methods.
+                  No supersaw pattern detected. Lead/synth content appears to use other synthesis
+                  methods.
                 </p>
               )}
             </div>
@@ -460,8 +473,8 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
                     showValue={false}
                   />
                   <p className="text-[10px] text-zinc-500 leading-relaxed">
-                    Vocal content detected in the mix. Formant structure and spectral characteristics indicate
-                    human voice presence.
+                    Vocal content detected in the mix. Formant structure and spectral
+                    characteristics indicate human voice presence.
                   </p>
                 </>
               )}
@@ -485,7 +498,9 @@ const EnhancedAnalysisPanel: React.FC<EnhancedAnalysisPanelProps> = ({ telemetry
             <div className="space-y-3">
               <div>
                 <p className="text-[10px] text-zinc-500 mb-0.5">Style Family</p>
-                <p className="text-sm font-bold text-zinc-200">{telemetry.maestAnalysis.primaryFamily}</p>
+                <p className="text-sm font-bold text-zinc-200">
+                  {telemetry.maestAnalysis.primaryFamily}
+                </p>
               </div>
               <div>
                 <p className="text-[10px] text-zinc-500 mb-0.5">Subgenre</p>

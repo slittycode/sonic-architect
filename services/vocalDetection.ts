@@ -38,17 +38,12 @@ const HOP_SIZE = 512;
 /**
  * Detect vocal presence using spectral analysis.
  */
-export function detectVocals(
-  audioBuffer: AudioBuffer,
-  mfcc?: number[]
-): VocalDetectionResult {
+export function detectVocals(audioBuffer: AudioBuffer, mfcc?: number[]): VocalDetectionResult {
   const sampleRate = audioBuffer.sampleRate;
   const channelData = audioBuffer.getChannelData(0);
 
   // Step 1: Calculate energy in vocal frequency ranges
-  const vocalFundamentalLowBin = Math.floor(
-    (VOCAL_FUNDAMENTAL_LOW * FRAME_SIZE) / sampleRate
-  );
+  const vocalFundamentalLowBin = Math.floor((VOCAL_FUNDAMENTAL_LOW * FRAME_SIZE) / sampleRate);
   const vocalFundamentalHighBin = Math.min(
     Math.ceil((VOCAL_FUNDAMENTAL_HIGH * FRAME_SIZE) / sampleRate),
     FRAME_SIZE / 2 - 1
@@ -66,14 +61,12 @@ export function detectVocals(
   const real = new Float32Array(FRAME_SIZE);
   const imag = new Float32Array(FRAME_SIZE);
 
-  for (
-    let offset = 0;
-    offset + FRAME_SIZE <= channelData.length;
-    offset += HOP_SIZE
-  ) {
+  for (let offset = 0; offset + FRAME_SIZE <= channelData.length; offset += HOP_SIZE) {
     // Apply window and FFT
     for (let i = 0; i < FRAME_SIZE; i++) {
-      real[i] = (channelData[offset + i] ?? 0) * (0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (FRAME_SIZE - 1)));
+      real[i] =
+        (channelData[offset + i] ?? 0) *
+        (0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (FRAME_SIZE - 1)));
       imag[i] = 0;
     }
     fftInPlace(real, imag);
@@ -99,10 +92,7 @@ export function detectVocals(
 
   // Step 2: Formant strength detection
   // Vocals have characteristic formant peaks at ~500Hz, ~1.5kHz, ~2.5kHz
-  const formantStrength = detectFormantStrength(
-    channelData,
-    sampleRate
-  );
+  const formantStrength = detectFormantStrength(channelData, sampleRate);
 
   // Step 3: MFCC-based vocal likelihood (if MFCC provided)
   const mfccLikelihood = mfcc ? calculateMfccVocalLikelihood(mfcc) : 0.5;
@@ -116,10 +106,7 @@ export function detectVocals(
   const formantScore = formantStrength;
   const mfccScore = mfccLikelihood;
 
-  const confidence =
-    energyScore * 0.35 +
-    formantScore * 0.35 +
-    mfccScore * 0.3;
+  const confidence = energyScore * 0.35 + formantScore * 0.35 + mfccScore * 0.3;
 
   const hasVocals = confidence > 0.45;
 
@@ -136,10 +123,7 @@ export function detectVocals(
  * Detect formant structure characteristic of human voice.
  * Uses peak detection in spectrum to find formant frequencies.
  */
-function detectFormantStrength(
-  channelData: Float32Array,
-  sampleRate: number
-): number {
+function detectFormantStrength(channelData: Float32Array, sampleRate: number): number {
   // Expected formant frequencies for average adult voice
   const expectedFormants = [500, 1500, 2500]; // Hz
   const formantTolerance = 200; // Hz tolerance
@@ -151,11 +135,7 @@ function detectFormantStrength(
   let totalFrames = 0;
 
   // Analyze multiple frames
-  for (
-    let offset = 0;
-    offset + FRAME_SIZE <= channelData.length;
-    offset += HOP_SIZE * 4
-  ) {
+  for (let offset = 0; offset + FRAME_SIZE <= channelData.length; offset += HOP_SIZE * 4) {
     totalFrames++;
 
     // FFT
@@ -181,9 +161,7 @@ function detectFormantStrength(
     // Check if peaks match expected formant frequencies
     let frameFormantMatches = 0;
     for (const expected of expectedFormants) {
-      const hasMatch = peaks.some(
-        (peak) => Math.abs(peak - expected) < formantTolerance
-      );
+      const hasMatch = peaks.some((peak) => Math.abs(peak - expected) < formantTolerance);
       if (hasMatch) frameFormantMatches++;
     }
 
@@ -191,9 +169,7 @@ function detectFormantStrength(
   }
 
   // Return ratio of matched formants (0-3 formants / 3 expected)
-  return totalFrames > 0
-    ? Math.min(1, (formantMatches / totalFrames) / 3)
-    : 0;
+  return totalFrames > 0 ? Math.min(1, formantMatches / totalFrames / 3) : 0;
 }
 
 /**
@@ -216,10 +192,7 @@ function calculateMfccVocalLikelihood(mfcc: number[]): number {
     Math.abs(mfcc[7]) +
     Math.abs(mfcc[8]);
   const highEnergy =
-    Math.abs(mfcc[9]) +
-    Math.abs(mfcc[10]) +
-    Math.abs(mfcc[11]) +
-    Math.abs(mfcc[12]);
+    Math.abs(mfcc[9]) + Math.abs(mfcc[10]) + Math.abs(mfcc[11]) + Math.abs(mfcc[12]);
 
   // Vocal pattern: strong low, moderate mid, lower high
   const totalEnergy = lowEnergy + midEnergy + highEnergy;

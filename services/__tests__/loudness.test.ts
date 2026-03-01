@@ -35,10 +35,7 @@ function createSineBuffer(
 }
 
 /** Create a silent AudioBuffer. */
-function createSilentBuffer(
-  durationSec: number = 2,
-  sampleRate: number = 48000
-): AudioBuffer {
+function createSilentBuffer(durationSec: number = 2, sampleRate: number = 48000): AudioBuffer {
   const length = Math.floor(sampleRate * durationSec);
   return createMockAudioBuffer([new Float32Array(length)], sampleRate);
 }

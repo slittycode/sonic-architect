@@ -13,6 +13,7 @@
 ### Task 1: Move Chord Progression to Full-Width Block
 
 **Files:**
+
 - Modify: `components/BlueprintDisplay.tsx`
 
 The chord panel currently lives inside the left column of the 3-column grid (lines 174–237). It needs to be its own full-width section between the spectral panels and the Mix Doctor panel.
@@ -28,67 +29,71 @@ The left column should end at line 173 with `</div>` closing the Timeline panel,
 In `BlueprintDisplay.tsx`, after the closing `</div>` of the spectral section block (currently line 480, after `{/_ Spectral Timeline Visualization _/}`), insert the full-width chord panel before `{/_ Mix Doctor Dashboard _/}`:
 
 ```tsx
-{/* Chord Progression — Full Width */}
-{blueprint.chordProgression && blueprint.chordProgression.length > 0 && (
-  <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
-    <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
-      <Music className="w-4 h-4 text-amber-400" aria-hidden="true" />
-      <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
-        Chord Progression
-      </h3>
-      {blueprint.chordProgressionSummary && (
-        <span className="ml-auto text-xs text-amber-400/70 font-mono">
-          {blueprint.chordProgressionSummary}
-        </span>
-      )}
-    </div>
-    <div className="p-4">
-      {(() => {
-        const chords = blueprint.chordProgression;
-        const totalStart = parseSegTime(chords[0].timeRange, 'start');
-        const totalEnd = parseSegTime(chords[chords.length - 1].timeRange, 'end');
-        const totalDuration = Math.max(1, totalEnd - totalStart);
-        return (
-          <div className="overflow-x-auto">
-            <div
-              className="flex gap-px"
-              style={{ minWidth: `${Math.max(800, chords.length * 60)}px` }}
-            >
-              {chords.map((seg, idx) => {
-                const s = parseSegTime(seg.timeRange, 'start');
-                const e = parseSegTime(seg.timeRange, 'end');
-                const pct = Math.max(4, ((e - s) / totalDuration) * 100);
-                const hue = (rootNoteIndex(seg.root) * 30) % 360;
-                return (
-                  <div
-                    key={idx}
-                    style={{ flex: `${pct} 0 0%` }}
-                    className="flex flex-col items-center py-2 px-1 bg-zinc-950 border border-zinc-800/50 rounded-sm hover:bg-zinc-800 transition-colors cursor-default"
-                    title={`${seg.chord} · ${seg.timeRange} · ${Math.round(seg.confidence * 100)}% conf`}
-                  >
-                    <span
-                      className="text-xs font-bold mono"
-                      style={{ color: `hsl(${hue},60%,65%)` }}
-                    >
-                      {seg.chord}
-                    </span>
-                    <span className="text-[8px] text-zinc-600 mt-0.5 mono">
-                      {seg.timeRange.split('–')[0]}
-                    </span>
+{
+  /* Chord Progression — Full Width */
+}
+{
+  blueprint.chordProgression && blueprint.chordProgression.length > 0 && (
+    <div className="mt-6 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
+        <Music className="w-4 h-4 text-amber-400" aria-hidden="true" />
+        <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+          Chord Progression
+        </h3>
+        {blueprint.chordProgressionSummary && (
+          <span className="ml-auto text-xs text-amber-400/70 font-mono">
+            {blueprint.chordProgressionSummary}
+          </span>
+        )}
+      </div>
+      <div className="p-4">
+        {(() => {
+          const chords = blueprint.chordProgression;
+          const totalStart = parseSegTime(chords[0].timeRange, 'start');
+          const totalEnd = parseSegTime(chords[chords.length - 1].timeRange, 'end');
+          const totalDuration = Math.max(1, totalEnd - totalStart);
+          return (
+            <div className="overflow-x-auto">
+              <div
+                className="flex gap-px"
+                style={{ minWidth: `${Math.max(800, chords.length * 60)}px` }}
+              >
+                {chords.map((seg, idx) => {
+                  const s = parseSegTime(seg.timeRange, 'start');
+                  const e = parseSegTime(seg.timeRange, 'end');
+                  const pct = Math.max(4, ((e - s) / totalDuration) * 100);
+                  const hue = (rootNoteIndex(seg.root) * 30) % 360;
+                  return (
                     <div
-                      className="w-full mt-1 h-px rounded-full"
-                      style={{ background: `hsl(${hue},50%,40%)`, opacity: seg.confidence }}
-                    />
-                  </div>
-                );
-              })}
+                      key={idx}
+                      style={{ flex: `${pct} 0 0%` }}
+                      className="flex flex-col items-center py-2 px-1 bg-zinc-950 border border-zinc-800/50 rounded-sm hover:bg-zinc-800 transition-colors cursor-default"
+                      title={`${seg.chord} · ${seg.timeRange} · ${Math.round(seg.confidence * 100)}% conf`}
+                    >
+                      <span
+                        className="text-xs font-bold mono"
+                        style={{ color: `hsl(${hue},60%,65%)` }}
+                      >
+                        {seg.chord}
+                      </span>
+                      <span className="text-[8px] text-zinc-600 mt-0.5 mono">
+                        {seg.timeRange.split('–')[0]}
+                      </span>
+                      <div
+                        className="w-full mt-1 h-px rounded-full"
+                        style={{ background: `hsl(${hue},50%,40%)`, opacity: seg.confidence }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 **Step 3: Verify typecheck**
@@ -96,6 +101,7 @@ In `BlueprintDisplay.tsx`, after the closing `</div>` of the spectral section bl
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 4: Commit**
@@ -110,9 +116,10 @@ git commit -m "feat: move chord progression to full-width panel below spectral d
 ### Task 2: Fix Markdown Renderer — `1)` Format and Multi-Paragraph Items
 
 **Files:**
+
 - Modify: `components/BlueprintDisplay.tsx` (lines 40–68, the `renderMarkdown` function)
 
-**Problem:** `renderMarkdown` splits on `\n\n` then checks if *every* line in a block matches the numbered pattern. LLMs output `1)` (parenthesis) not `1.`, and each numbered item often appears as its own `\n\n`-separated block, so `lines.every()` passes for single-line items but consecutive numbered blocks don't merge into one `<ol>`.
+**Problem:** `renderMarkdown` splits on `\n\n` then checks if _every_ line in a block matches the numbered pattern. LLMs output `1)` (parenthesis) not `1.`, and each numbered item often appears as its own `\n\n`-separated block, so `lines.every()` passes for single-line items but consecutive numbered blocks don't merge into one `<ol>`.
 
 **Step 1: Replace renderMarkdown with two-pass grouping version**
 
@@ -195,6 +202,7 @@ function renderMarkdown(text: string): React.ReactNode {
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 3: Commit**
@@ -209,6 +217,7 @@ git commit -m "fix: rewrite markdown renderer to handle 1) format and multi-para
 ### Task 3: Add Proportional/Absolute Toggle to Spectral Area Chart
 
 **Files:**
+
 - Modify: `components/SpectralAreaChart.tsx`
 - Modify: `components/BlueprintDisplay.tsx`
 
@@ -222,7 +231,7 @@ interface SpectralAreaChartProps {
   timeline: SpectralTimeline;
   arrangement: ArrangementSection[];
   duration: number;
-  mode?: 'proportional' | 'absolute';  // add this
+  mode?: 'proportional' | 'absolute'; // add this
 }
 ```
 
@@ -238,6 +247,7 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
 ```
 
 In the data loop, replace the normalization block:
+
 ```typescript
 // Build tabular data: array of objects { time, "Sub Bass": val, ... }
 const data: Record<string, number>[] = [];
@@ -252,15 +262,14 @@ for (let p = 0; p < numPoints; p++) {
   }
   for (let b = 0; b < timeline.bands.length; b++) {
     row[timeline.bands[b].name] =
-      mode === 'proportional' && totalPower > 0
-        ? (powers[b] / totalPower) * 100
-        : powers[b];
+      mode === 'proportional' && totalPower > 0 ? (powers[b] / totalPower) * 100 : powers[b];
   }
   data.push(row);
 }
 ```
 
 Update Y-axis label format to reflect mode:
+
 ```typescript
 // Replace Y axis tickFormat (currently `.tickFormat((d) => `${Math.round(d as number)}%`)`)
 .tickFormat((d) =>
@@ -275,15 +284,19 @@ Update Y-axis label format to reflect mode:
 `BlueprintDisplay` is currently a pure functional component with no state. Convert it to use `useState` for the spectral mode toggle, with localStorage persistence:
 
 At the top of `BlueprintDisplay.tsx`, add `useState` to the React import:
+
 ```typescript
 import React, { useState } from 'react';
 ```
 
 Inside `BlueprintDisplay` component body (just after `const BlueprintDisplay: React.FC<...> = ({ blueprint }) => {`), add:
+
 ```typescript
 const [spectralMode, setSpectralMode] = useState<'proportional' | 'absolute'>(() => {
   try {
-    return (localStorage.getItem('sonic-spectral-mode') as 'proportional' | 'absolute') ?? 'proportional';
+    return (
+      (localStorage.getItem('sonic-spectral-mode') as 'proportional' | 'absolute') ?? 'proportional'
+    );
   } catch {
     return 'proportional';
   }
@@ -292,11 +305,14 @@ const [spectralMode, setSpectralMode] = useState<'proportional' | 'absolute'>(()
 const toggleSpectralMode = () => {
   const next = spectralMode === 'proportional' ? 'absolute' : 'proportional';
   setSpectralMode(next);
-  try { localStorage.setItem('sonic-spectral-mode', next); } catch {}
+  try {
+    localStorage.setItem('sonic-spectral-mode', next);
+  } catch {}
 };
 ```
 
 In the "Spectral Balance Over Time" panel header, add toggle button alongside the title:
+
 ```tsx
 <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700 flex items-center gap-2">
   <Activity className="w-4 h-4 text-violet-400" aria-hidden="true" />
@@ -322,6 +338,7 @@ In the "Spectral Balance Over Time" panel header, add toggle button alongside th
 ```
 
 Pass `mode` to `SpectralAreaChart`:
+
 ```tsx
 <SpectralAreaChart
   timeline={blueprint.spectralTimeline}
@@ -336,6 +353,7 @@ Pass `mode` to `SpectralAreaChart`:
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 4: Commit**
@@ -350,6 +368,7 @@ git commit -m "feat: add proportional/absolute toggle to spectral area chart, pe
 ### Task 4: Add PLR to Types
 
 **Files:**
+
 - Modify: `types.ts`
 
 PLR (Peak-to-Loudness Ratio) = TruePeak(dBTP) − LUFS_integrated. Higher = more dynamic (uncompressed). Lower = more compressed.
@@ -359,18 +378,21 @@ PLR (Peak-to-Loudness Ratio) = TruePeak(dBTP) − LUFS_integrated. Higher = more
 In `types.ts`:
 
 After `crestFactor: number;` (line 111), add:
+
 ```typescript
 /** Peak-to-Loudness Ratio in dB (TruePeak − LUFS). Higher = more dynamic. Set when lufsIntegrated and truePeak are available. */
 plr?: number;
 ```
 
 After `targetCrestFactorRange: [number, number];` (line 207), add:
+
 ```typescript
 /** Expected PLR range in dB (TruePeak − LUFS_integrated). Replaces crest factor for compression assessment. */
 targetPlrRange?: [number, number];
 ```
 
 In `MixDoctorReport.dynamicsAdvice`, add `actualPlr`:
+
 ```typescript
 dynamicsAdvice: {
   issue: 'too-compressed' | 'too-dynamic' | 'optimal';
@@ -385,6 +407,7 @@ dynamicsAdvice: {
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 3: Commit**
@@ -399,6 +422,7 @@ git commit -m "feat: add plr to AudioFeatures and targetPlrRange to GenreProfile
 ### Task 5: Compute PLR in audioAnalysis.ts
 
 **Files:**
+
 - Modify: `services/audioAnalysis.ts`
 
 **Step 1: Compute PLR after measureLoudness**
@@ -417,6 +441,7 @@ const plr: number | undefined =
 ```
 
 Add `plr` to the returned object (after `crestFactor`):
+
 ```typescript
 return {
   bpm,
@@ -427,7 +452,7 @@ return {
   rmsProfile,
   spectralBands,
   crestFactor: Math.round(crestFactor * 10) / 10,
-  plr,                     // add this
+  plr, // add this
   onsetCount,
   // ... rest unchanged
 };
@@ -438,6 +463,7 @@ return {
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 3: Commit**
@@ -452,9 +478,11 @@ git commit -m "feat: compute PLR (Peak-to-Loudness Ratio) in audioAnalysis"
 ### Task 6: Add targetPlrRange to Genre Profiles
 
 **Files:**
+
 - Modify: `data/genreProfiles.ts`
 
 PLR values are calibrated from real commercial releases:
+
 - Heavily compressed club music (Techno): PLR 5–9 dB
 - Standard electronic/dance (EDM, House, Garage): PLR 6–10 dB
 - Punchy with dynamics (Hip Hop, Pop, DnB): PLR 7–11 dB
@@ -503,6 +531,7 @@ Add each `targetPlrRange` field immediately after `targetCrestFactorRange` in ea
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 3: Commit**
@@ -517,6 +546,7 @@ git commit -m "feat: add targetPlrRange to all genre profiles"
 ### Task 7: Use PLR in Mix Doctor Scoring
 
 **Files:**
+
 - Modify: `services/mixDoctor.ts`
 
 **Step 1: Replace crest factor dynamics logic with PLR-primary scoring**
@@ -549,11 +579,13 @@ if (plr != null && profile.targetPlrRange) {
   const [minCrest, maxCrest] = profile.targetCrestFactorRange;
   if (crest < minCrest) {
     dynamicsIssue = 'too-compressed';
-    dynamicsMsg = 'Too compressed/squashed. The mix lacks transient punch. Ease off the master limiter or bus compressors.';
+    dynamicsMsg =
+      'Too compressed/squashed. The mix lacks transient punch. Ease off the master limiter or bus compressors.';
     dynamicsPenalty = Math.min(15, (minCrest - crest) * 2.5);
   } else if (crest > maxCrest) {
     dynamicsIssue = 'too-dynamic';
-    dynamicsMsg = 'Too dynamic. Transients are jumping out too much. Add bus compression or saturation to glue the mix.';
+    dynamicsMsg =
+      'Too dynamic. Transients are jumping out too much. Add bus compression or saturation to glue the mix.';
     dynamicsPenalty = Math.min(15, (crest - maxCrest) * 2.5);
   }
 }
@@ -575,6 +607,7 @@ dynamicsAdvice: {
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 3: Run mix doctor tests**
@@ -582,6 +615,7 @@ Expected: no errors
 ```bash
 pnpm vitest run services/__tests__/mixDoctor.test.ts
 ```
+
 Expected: all pass (tests use crest factor fixtures; PLR path is optional)
 
 **Step 4: Commit**
@@ -596,6 +630,7 @@ git commit -m "feat: use PLR as primary dynamics metric in Mix Doctor, crest fac
 ### Task 8: Update MixDoctorPanel to Show PLR and Crest Factor
 
 **Files:**
+
 - Modify: `components/MixDoctorPanel.tsx`
 
 **Step 1: Update the DiagnosticCard for dynamics**
@@ -603,6 +638,7 @@ git commit -m "feat: use PLR as primary dynamics metric in Mix Doctor, crest fac
 The existing dynamics block (currently lines 253–259) passes `actualCrest` to `DiagnosticCard`. Update it to show both metrics:
 
 Replace:
+
 ```tsx
 <DiagnosticCard
   accentColor="bg-blue-500"
@@ -614,6 +650,7 @@ Replace:
 ```
 
 With:
+
 ```tsx
 <DiagnosticCard
   accentColor="bg-blue-500"
@@ -627,7 +664,8 @@ With:
   {report.dynamicsAdvice.message}
   {report.dynamicsAdvice.actualPlr != null && (
     <span className="block mt-1 text-[10px] text-zinc-600">
-      Crest factor: {report.dynamicsAdvice.actualCrest} dB · PLR: {report.dynamicsAdvice.actualPlr} dB
+      Crest factor: {report.dynamicsAdvice.actualCrest} dB · PLR: {report.dynamicsAdvice.actualPlr}{' '}
+      dB
     </span>
   )}
 </DiagnosticCard>
@@ -638,6 +676,7 @@ With:
 ```bash
 pnpm run typecheck
 ```
+
 Expected: no errors
 
 **Step 3: Run all tests**
@@ -645,6 +684,7 @@ Expected: no errors
 ```bash
 pnpm vitest run
 ```
+
 Expected: all pass
 
 **Step 4: Commit**
@@ -667,6 +707,7 @@ pnpm dev             # manual check:
 ```
 
 Manual checks:
+
 1. Chord progression appears as a full-width panel **after** the spectral visualizations, before Mix Doctor
 2. Secret Sauce text with `1) paragraph`, `2) paragraph` renders as a numbered list, not raw text
 3. "Spectral Balance Over Time" panel header has `%` and `abs` toggle buttons; clicking switches between normalized % and raw power stacking; preference survives page reload

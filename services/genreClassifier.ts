@@ -143,7 +143,7 @@ export function classifyGenre(features: AudioFeatures): GenreClassification {
     const centroidScore = rangeScore(features.spectralCentroidMean, sig.spectralCentroid, 0.0005);
 
     scores[sig.id] =
-      bpmScore * 0.30 + subScore * 0.25 + crestScore * 0.20 + onsetScore * 0.15 + centroidScore * 0.10;
+      bpmScore * 0.3 + subScore * 0.25 + crestScore * 0.2 + onsetScore * 0.15 + centroidScore * 0.1;
   }
 
   // Find best match

@@ -55,7 +55,7 @@ export function analyzeReverb(audioBuffer: AudioBuffer, bpm: number): ReverbAnal
 
     if (envelope[i] > runningAvg * TRANSIENT_THRESHOLD_RATIO && envelope[i] > 0.001) {
       // Enforce minimum distance (~half a beat)
-      const minDistFrames = Math.floor(((60 / bpm) * 1000) / HOP_MS * 0.5);
+      const minDistFrames = Math.floor((((60 / bpm) * 1000) / HOP_MS) * 0.5);
       const lastTransient = transientIndices[transientIndices.length - 1] ?? -minDistFrames;
       if (i - lastTransient >= minDistFrames) {
         transientIndices.push(i);

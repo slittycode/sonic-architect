@@ -261,10 +261,10 @@ export function buildLocalBlueprint(
         sidechainAnalysis: enhancedGenreResult.sidechainAnalysis || undefined,
         bassAnalysis: enhancedGenreResult.bassAnalysis
           ? {
-              decayMs: enhancedGenreResult.bassAnalysis.averageDecayMs,
-              type: enhancedGenreResult.bassAnalysis.type,
-              transientRatio: enhancedGenreResult.bassAnalysis.transientRatio,
-            }
+            decayMs: enhancedGenreResult.bassAnalysis.averageDecayMs,
+            type: enhancedGenreResult.bassAnalysis.type,
+            transientRatio: enhancedGenreResult.bassAnalysis.transientRatio,
+          }
           : undefined,
         swingAnalysis: enhancedGenreResult.swingAnalysis || undefined,
         acidAnalysis: enhancedGenreResult.acidAnalysis || undefined,
@@ -280,21 +280,21 @@ export function buildLocalBlueprint(
       fxChain.length > 0
         ? fxChain
         : [
-            {
-              artifact: 'Balanced dynamics and spectrum',
-              recommendation:
-                'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
-            },
-          ],
+          {
+            artifact: 'Balanced dynamics and spectrum',
+            recommendation:
+              'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
+          },
+        ],
     secretSauce,
     patches,
     mixReport,
     mfcc: features.mfcc,
     ...(chordResult && chordResult.chords.length > 0
       ? {
-          chordProgression: chordResult.chords,
-          chordProgressionSummary: chordResult.progression,
-        }
+        chordProgression: chordResult.chords,
+        chordProgressionSummary: chordResult.progression,
+      }
       : {}),
     meta: {
       provider,
@@ -317,7 +317,12 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     return true;
   }
 
-  async analyze(file: File, signal?: AbortSignal): Promise<ReconstructionBlueprint> {
+  async analyze(
+    file: File,
+    signal?: AbortSignal,
+    onProgress?: (message: string) => void
+  ): Promise<ReconstructionBlueprint> {
+    onProgress?.('Decoding audio...');
     const audioBuffer = await decodeAudioFile(file);
     signal?.throwIfAborted();
     return this.analyzeAudioBuffer(audioBuffer, signal);
@@ -392,18 +397,6 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     // Inject beat positions into telemetry (not part of AudioFeatures)
     blueprint.telemetry.beatPositions = beatResult.beats;
     blueprint.telemetry.downbeatPosition = beatResult.downbeat;
-
-    // MAEST browser ML genre classification (optional, non-blocking)
-    // Runs with a 45-second ceiling via Promise.race inside classifyDiscogsMaest.
-    const maestResult = await import('./discogsMaest')
-      .then(({ classifyDiscogsMaest }) => classifyDiscogsMaest(audioBuffer))
-      .catch((err) => {
-        console.warn('[LocalProvider] MAEST classification unavailable:', err);
-        return null;
-      });
-    if (maestResult) {
-      blueprint.telemetry.maestAnalysis = maestResult;
-    }
 
     return blueprint;
   }

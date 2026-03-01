@@ -281,9 +281,7 @@ export function detectChords(
   const final: ChordSegment[] =
     postFiltered.length <= 32
       ? postFiltered
-      : postFiltered.filter(
-          (_, i) => i % Math.ceil(postFiltered.length / 32) === 0
-        );
+      : postFiltered.filter((_, i) => i % Math.ceil(postFiltered.length / 32) === 0);
 
   const uniqueSequence: string[] = [];
   for (const chord of final) {
@@ -293,8 +291,7 @@ export function detectChords(
   }
 
   const progression = uniqueSequence.join(' – ');
-  const averageConfidence =
-    final.reduce((sum, chord) => sum + chord.confidence, 0) / final.length;
+  const averageConfidence = final.reduce((sum, chord) => sum + chord.confidence, 0) / final.length;
 
   return {
     chords: final,

@@ -80,9 +80,7 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
         // Proportional: normalise each slice to 100% (shows tonal balance shape)
         // Absolute: raw linear power (stack height rises/falls with total energy)
         row[timeline.bands[b].name] =
-          mode === 'proportional' && totalPower > 0
-            ? (powers[b] / totalPower) * 100
-            : powers[b];
+          mode === 'proportional' && totalPower > 0 ? (powers[b] / totalPower) * 100 : powers[b];
       }
       data.push(row);
     }
@@ -157,9 +155,7 @@ const SpectralAreaChart: React.FC<SpectralAreaChartProps> = ({
           .axisLeft(y)
           .ticks(4)
           .tickFormat((d) =>
-            mode === 'proportional'
-              ? `${Math.round(d as number)}%`
-              : (d as number).toExponential(1)
+            mode === 'proportional' ? `${Math.round(d as number)}%` : (d as number).toExponential(1)
           )
       )
       .selectAll('text')

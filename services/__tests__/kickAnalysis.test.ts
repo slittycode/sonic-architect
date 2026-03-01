@@ -33,7 +33,8 @@ function createCleanKickBuffer(sampleRate = 44100, bpm = 120): AudioBuffer {
     const kickLen = Math.min(4096, totalSamples - kickStart);
     for (let i = 0; i < kickLen; i++) {
       const t = i / sampleRate;
-      const amp = i < attackSamples ? i / attackSamples : Math.exp(-(i - attackSamples) / sampleRate * 30);
+      const amp =
+        i < attackSamples ? i / attackSamples : Math.exp((-(i - attackSamples) / sampleRate) * 30);
       // Pure 50Hz sine — low harmonic content → low THD
       data[kickStart + i] = amp * Math.sin(2 * Math.PI * 50 * t);
     }
@@ -58,7 +59,8 @@ function createDistortedKickBuffer(sampleRate = 44100, bpm = 120): AudioBuffer {
     const kickLen = Math.min(4096, totalSamples - kickStart);
     for (let i = 0; i < kickLen; i++) {
       const t = i / sampleRate;
-      const amp = i < attackSamples ? i / attackSamples : Math.exp(-(i - attackSamples) / sampleRate * 30);
+      const amp =
+        i < attackSamples ? i / attackSamples : Math.exp((-(i - attackSamples) / sampleRate) * 30);
       // Fundamental + heavy harmonics (simulating heavy saturation)
       data[kickStart + i] =
         amp *

@@ -27,7 +27,10 @@ export function detectAcidPattern(audioBuffer: AudioBuffer, bpm: number): AcidDe
   const channelData = audioBuffer.getChannelData(0);
 
   const lowBin = Math.floor((ACID_BASS_LOW * FRAME_SIZE) / sampleRate);
-  const highBin = Math.min(Math.ceil((ACID_BASS_HIGH * FRAME_SIZE) / sampleRate), FRAME_SIZE / 2 - 1);
+  const highBin = Math.min(
+    Math.ceil((ACID_BASS_HIGH * FRAME_SIZE) / sampleRate),
+    FRAME_SIZE / 2 - 1
+  );
 
   const centroids: number[] = [];
   const bandRms: number[] = [];
@@ -69,7 +72,13 @@ export function detectAcidPattern(audioBuffer: AudioBuffer, bpm: number): AcidDe
   }
 
   if (centroids.length < 10) {
-    return { isAcid: false, confidence: 0, resonanceLevel: 0, centroidOscillationHz: 0, bassRhythmDensity: 0 };
+    return {
+      isAcid: false,
+      confidence: 0,
+      resonanceLevel: 0,
+      centroidOscillationHz: 0,
+      bassRhythmDensity: 0,
+    };
   }
 
   // Centroid oscillation (std dev = filter sweep indicator)

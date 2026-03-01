@@ -2,7 +2,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const { fixtureBlueprint, localAnalyzeAudioBuffer, ollamaIsAvailable, fakeAudioBuffer } =
+const { fixtureBlueprint, localAnalyzeAudioBuffer, geminiIsAvailable, fakeAudioBuffer } =
   vi.hoisted(() => {
     const fixtureBlueprintValue = {
       telemetry: {
@@ -49,7 +49,7 @@ const { fixtureBlueprint, localAnalyzeAudioBuffer, ollamaIsAvailable, fakeAudioB
     return {
       fixtureBlueprint: fixtureBlueprintValue,
       localAnalyzeAudioBuffer: vi.fn(async () => fixtureBlueprintValue),
-      ollamaIsAvailable: vi.fn(async () => false),
+      geminiIsAvailable: vi.fn(async () => false),
       fakeAudioBuffer: {
         sampleRate: 48000,
         numberOfChannels: 1,
@@ -76,22 +76,27 @@ vi.mock('../services/localProvider', () => {
   return { LocalAnalysisProvider: LocalAnalysisProviderMock };
 });
 
-vi.mock('../services/ollamaProvider', () => {
-  class OllamaProviderMock {
-    name = 'Local LLM (Ollama)';
-    type = 'ollama' as const;
-    async isAvailable(): Promise<boolean> {
-      return ollamaIsAvailable();
-    }
-    async analyze(): Promise<typeof fixtureBlueprint> {
-      return fixtureBlueprint;
-    }
-    async analyzeAudioBuffer(): Promise<typeof fixtureBlueprint> {
-      return fixtureBlueprint;
-    }
-  }
-
-  return { OllamaProvider: OllamaProviderMock };
+vi.mock('../services/gemini', () => {
+  return {
+    GeminiProvider: class {
+      name = 'Gemini';
+      type = 'gemini' as const;
+      async isAvailable(): Promise<boolean> {
+        return geminiIsAvailable();
+      }
+      async analyze(): Promise<typeof fixtureBlueprint> {
+        return fixtureBlueprint;
+      }
+    },
+    GeminiChatService: class {
+      async sendMessage() {
+        return new ReadableStream();
+      }
+      clearHistory() {}
+    },
+    GEMINI_MODELS: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', group: 'stable' }],
+    GEMINI_MODEL_LABELS: { 'gemini-2.5-flash': 'Gemini 2.5 Flash' },
+  };
 });
 
 vi.mock('../services/audioAnalysis', () => ({
@@ -116,11 +121,14 @@ describe('App provider fallback', () => {
     vi.clearAllMocks();
   });
 
-  it('falls back to local analysis when ollama is selected but unavailable', async () => {
+  it('falls back to local analysis when gemini is selected but API key is missing', async () => {
+    geminiIsAvailable.mockResolvedValue(false);
+
     const { container } = render(<App />);
 
+    // Open settings and select Gemini
     fireEvent.click(screen.getByLabelText(/analysis engine settings/i));
-    fireEvent.click(screen.getByText('Ollama + Local DSP'));
+    fireEvent.click(screen.getByText(/Gemini/));
 
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement | null;
     expect(fileInput).not.toBeNull();
@@ -133,7 +141,7 @@ describe('App provider fallback', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Ollama not detected\. Using Local DSP Engine\./i)
+        screen.getByText(/Gemini API key not found\. Using Local DSP Engine\./i)
       ).toBeInTheDocument();
     });
 
@@ -141,7 +149,6 @@ describe('App provider fallback', () => {
       expect(screen.getByText(/Engine: Local DSP/i)).toBeInTheDocument();
     });
 
-    expect(ollamaIsAvailable).toHaveBeenCalledTimes(1);
     expect(localAnalyzeAudioBuffer).toHaveBeenCalledTimes(1);
   });
 });

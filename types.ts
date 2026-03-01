@@ -2,8 +2,8 @@ export interface GlobalTelemetry {
   bpm: string;
   key: string;
   groove: string;
-  /** Full structured Gemini audio analysis from Phase 1. */
-  geminiAudioAnalysis?: import('./services/gemini/types/analysis').AudioAnalysisResult;
+  /** Stored Phase 1 response (raw Zod-validated output). */
+  geminiPhase1?: import('./services/gemini/types/analysis').GeminiPhase1Response;
   /** Discogs MAEST browser ML classification result. */
   maestAnalysis?: {
     topLabels: Array<{ label: string; score: number }>;
@@ -81,6 +81,88 @@ export interface GlobalTelemetry {
     confidence: number;
     vocalEnergyRatio: number;
   };
+
+  // --- V2 Gemini-mode additions ---
+
+  /** Gemini sonic element breakdown (Gemini mode only). */
+  elements?: SonicElement[];
+  /** Gemini detected characteristics (Gemini mode only). */
+  detectedCharacteristics?: DetectedCharacteristics;
+  /** Gemini genre analysis (Gemini mode only). */
+  genreAnalysis?: GenreAnalysis;
+  /** Groove type label, e.g. "four-on-the-floor", "broken beat". */
+  grooveDescription?: string;
+  /** Chord progression from Gemini with summary. */
+  geminiChordProgression?: {
+    chords: Array<{ chord: string; startTime: number; duration: number }>;
+    summary: string;
+  };
+}
+
+// --- V2 New Types ---
+
+export interface LocalDSPHints {
+  bpm: number;
+  bpmConfidence: number;
+  key: string;
+  keyConfidence: number;
+  spectralBands: SpectralBandEnergy[];
+  spectralTimeline: SpectralTimeline;
+  rmsEnvelope: number[];
+  onsets: number[];
+  mfcc: number[][];
+  chordProgression: ChordSegment[];
+  essentiaFeatures?: {
+    dissonance?: number;
+    hfc?: number;
+    spectralComplexity?: number;
+    zeroCrossingRate?: number;
+  };
+  lufsIntegrated?: number;
+  truePeak?: number;
+  stereoCorrelation?: number;
+  stereoWidth?: number;
+  monoCompatible?: boolean;
+  duration: number;
+  sampleRate: number;
+  channelCount: number;
+}
+
+export interface MixFeedback {
+  overallAssessment: string;
+  spectralBalance: string;
+  stereoField: string;
+  dynamics: string;
+  lowEnd: string;
+  highEnd: string;
+  suggestions: string[];
+}
+
+export interface SonicElement {
+  name: string;
+  frequencyRange: string;
+  sonicCharacter: string;
+  howToRecreate: string;
+  suggestedDevices: string[];
+  role: string;
+}
+
+export interface DetectedCharacteristics {
+  sidechain?: { present: boolean; description: string; strength?: string };
+  acidResonance?: { present: boolean; description: string };
+  reverbCharacter?: { present: boolean; description: string; estimatedDecay?: string };
+  distortion?: { present: boolean; description: string; type?: string };
+  supersawLayers?: { present: boolean; description: string };
+  vocalPresence?: { present: boolean; description: string; type?: string };
+  bassCharacter?: { description: string; type?: string };
+  groove?: { swingAmount?: string; description: string };
+}
+
+export interface GenreAnalysis {
+  primary: string;
+  secondary: string[];
+  confidence: number;
+  reasoning: string;
 }
 
 export interface ArrangementSection {
@@ -141,6 +223,15 @@ export interface ReconstructionBlueprint {
   /** Per-band energy over time for spectral timeline visualization. */
   spectralTimeline?: SpectralTimeline;
   meta?: AnalysisMeta;
+
+  // --- V2 Gemini-mode additions ---
+
+  /** Gemini-powered mix feedback prose (Gemini mode only). */
+  mixFeedback?: MixFeedback;
+  /** Raw Gemini Phase 1 response for debugging/export. */
+  geminiPhase1?: object;
+  /** Raw Gemini Phase 2 response for debugging/export. */
+  geminiPhase2?: object;
 }
 
 export enum AnalysisStatus {
@@ -152,12 +243,16 @@ export enum AnalysisStatus {
 }
 
 // Provider types
-export type ProviderType = 'local' | 'ollama' | 'gemini' | 'claude' | 'openai' | 'azure_openai';
+export type ProviderType = 'local' | 'gemini';
 
 export interface AnalysisProvider {
   name: string;
   type: ProviderType;
-  analyze(file: File, signal?: AbortSignal): Promise<ReconstructionBlueprint>;
+  analyze(
+    file: File,
+    signal?: AbortSignal,
+    onProgress?: (message: string) => void
+  ): Promise<ReconstructionBlueprint>;
   isAvailable(): Promise<boolean>;
 }
 

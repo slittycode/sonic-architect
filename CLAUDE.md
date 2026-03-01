@@ -16,11 +16,13 @@ pnpm run qa:all       # Typecheck + lint + format check + tests
 ```
 
 Run a single test file:
+
 ```bash
 pnpm vitest run services/__tests__/bpmDetection.test.ts
 ```
 
 Run tests matching a name pattern:
+
 ```bash
 pnpm vitest run -t "detects BPM"
 ```

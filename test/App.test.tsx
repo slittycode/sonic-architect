@@ -37,7 +37,7 @@ describe('App', () => {
 
   it('toggles the AI chat panel from the toolbar', async () => {
     render(<App />);
-    const toggle = screen.getByRole('button', { name: /toggle claude chat/i });
+    const toggle = screen.getByRole('button', { name: /toggle chat/i });
 
     expect(screen.queryByText(/Assistant/i)).not.toBeInTheDocument();
     await userEvent.click(toggle);

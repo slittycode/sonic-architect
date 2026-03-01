@@ -53,9 +53,8 @@ export function generateMixReport(
       const normalizedDiff = rangeHalf > 0 ? Math.abs(diffToOptimal) / rangeHalf : 0;
       bandScore = 100 - normalizedDiff * 20;
     } else {
-      const overshoot = currentDb > target.maxDb
-        ? currentDb - target.maxDb
-        : target.minDb - currentDb;
+      const overshoot =
+        currentDb > target.maxDb ? currentDb - target.maxDb : target.minDb - currentDb;
       bandScore = 80 - overshoot * 5;
     }
     bandScore = Math.max(0, Math.min(100, bandScore));

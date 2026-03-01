@@ -34,10 +34,7 @@ let loadPromise: Promise<any> | null = null;
 
 /** Resolve model URL. Extracted so tests can mock the module without URL issues. */
 function getModelURL(): string {
-  return new URL(
-    '../node_modules/@spotify/basic-pitch/model/model.json',
-    import.meta.url
-  ).href;
+  return new URL('../node_modules/@spotify/basic-pitch/model/model.json', import.meta.url).href;
 }
 
 async function getBasicPitch() {
@@ -84,12 +81,7 @@ export async function detectPolyphonic(
   bpm: number = 120,
   options: PolyphonicOptions = {}
 ): Promise<PitchDetectionResult> {
-  const {
-    onsetThreshold = 0.5,
-    frameThreshold = 0.3,
-    minNoteLength = 5,
-    onProgress,
-  } = options;
+  const { onsetThreshold = 0.5, frameThreshold = 0.3, minNoteLength = 5, onProgress } = options;
 
   const bp = await getBasicPitch();
 
@@ -112,9 +104,8 @@ export async function detectPolyphonic(
   );
 
   // Import post-processing functions
-  const { outputToNotesPoly, addPitchBendsToNoteEvents, noteFramesToTime } = await import(
-    '@spotify/basic-pitch'
-  );
+  const { outputToNotesPoly, addPitchBendsToNoteEvents, noteFramesToTime } =
+    await import('@spotify/basic-pitch');
 
   // Convert raw model output to note events
   let noteEvents = outputToNotesPoly(

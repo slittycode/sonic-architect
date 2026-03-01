@@ -50,9 +50,21 @@ function makeFeatures(overrides: Partial<AudioFeatures> = {}): AudioFeatures {
       { name: 'Low Bass', rangeHz: [80, 250], averageDb: -12, peakDb: -8, dominance: 'dominant' },
       { name: 'Low Mids', rangeHz: [250, 500], averageDb: -22, peakDb: -16, dominance: 'present' },
       { name: 'Mids', rangeHz: [500, 2000], averageDb: -19, peakDb: -13, dominance: 'present' },
-      { name: 'Upper Mids', rangeHz: [2000, 5000], averageDb: -18, peakDb: -12, dominance: 'present' },
+      {
+        name: 'Upper Mids',
+        rangeHz: [2000, 5000],
+        averageDb: -18,
+        peakDb: -12,
+        dominance: 'present',
+      },
       { name: 'Highs', rangeHz: [5000, 10000], averageDb: -21, peakDb: -15, dominance: 'present' },
-      { name: 'Brilliance', rangeHz: [10000, 20000], averageDb: -26, peakDb: -20, dominance: 'weak' },
+      {
+        name: 'Brilliance',
+        rangeHz: [10000, 20000],
+        averageDb: -26,
+        peakDb: -20,
+        dominance: 'weak',
+      },
     ],
     ...overrides,
   };
@@ -94,7 +106,16 @@ describe('classifyGenreEnhanced', () => {
   }, 10000);
 
   it('returns genreFamily as one of the valid enum values', async () => {
-    const validFamilies = ['house', 'techno', 'dnb', 'ambient', 'trance', 'dubstep', 'breaks', 'other'];
+    const validFamilies = [
+      'house',
+      'techno',
+      'dnb',
+      'ambient',
+      'trance',
+      'dubstep',
+      'breaks',
+      'other',
+    ];
     const result = await classifyGenreEnhanced(makeFeatures(), createAnalysisBuffer());
     expect(validFamilies).toContain(result.genreFamily);
   }, 10000);
@@ -140,11 +161,35 @@ describe('classifyGenreEnhanced', () => {
       spectralBands: [
         { name: 'Sub Bass', rangeHz: [20, 80], averageDb: -7, peakDb: -3, dominance: 'dominant' },
         { name: 'Low Bass', rangeHz: [80, 250], averageDb: -11, peakDb: -7, dominance: 'dominant' },
-        { name: 'Low Mids', rangeHz: [250, 500], averageDb: -21, peakDb: -15, dominance: 'present' },
+        {
+          name: 'Low Mids',
+          rangeHz: [250, 500],
+          averageDb: -21,
+          peakDb: -15,
+          dominance: 'present',
+        },
         { name: 'Mids', rangeHz: [500, 2000], averageDb: -17, peakDb: -11, dominance: 'present' },
-        { name: 'Upper Mids', rangeHz: [2000, 5000], averageDb: -15, peakDb: -9, dominance: 'present' },
-        { name: 'Highs', rangeHz: [5000, 10000], averageDb: -18, peakDb: -12, dominance: 'present' },
-        { name: 'Brilliance', rangeHz: [10000, 20000], averageDb: -23, peakDb: -17, dominance: 'weak' },
+        {
+          name: 'Upper Mids',
+          rangeHz: [2000, 5000],
+          averageDb: -15,
+          peakDb: -9,
+          dominance: 'present',
+        },
+        {
+          name: 'Highs',
+          rangeHz: [5000, 10000],
+          averageDb: -18,
+          peakDb: -12,
+          dominance: 'present',
+        },
+        {
+          name: 'Brilliance',
+          rangeHz: [10000, 20000],
+          averageDb: -23,
+          peakDb: -17,
+          dominance: 'weak',
+        },
       ],
     });
     const result = await classifyGenreEnhanced(features, createAnalysisBuffer());

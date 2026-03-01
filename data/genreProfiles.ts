@@ -626,12 +626,12 @@ export function getEnhancedProfile(id: string): GenreProfile {
  */
 export function mapLegacyToEnhanced(legacyId: string): string[] {
   const mapping: Record<string, string[]> = {
-    'edm': ['progressive-house', 'classic-house'],
-    'techno': ['driving-techno', 'melodic-techno', 'minimal-techno'],
-    'house': ['classic-house', 'deep-house', 'tech-house'],
-    'ambient': ['ambient-drone', 'ambient-techno', 'dub-techno'],
-    'dnb': ['drum-bass', 'neurofunk'],
-    'garage': ['uk-garage', 'bassline'],
+    edm: ['progressive-house', 'classic-house'],
+    techno: ['driving-techno', 'melodic-techno', 'minimal-techno'],
+    house: ['classic-house', 'deep-house', 'tech-house'],
+    ambient: ['ambient-drone', 'ambient-techno', 'dub-techno'],
+    dnb: ['drum-bass', 'neurofunk'],
+    garage: ['uk-garage', 'bassline'],
   };
   return mapping[legacyId] || [legacyId];
 }
@@ -640,7 +640,18 @@ export function mapLegacyToEnhanced(legacyId: string): string[] {
  * Check if a genre ID is an enhanced subgenre.
  */
 export function isEnhancedGenre(id: string): boolean {
-  const legacyIds = ['edm', 'hiphop', 'rock', 'pop', 'acoustic', 'techno', 'house', 'ambient', 'dnb', 'garage'];
+  const legacyIds = [
+    'edm',
+    'hiphop',
+    'rock',
+    'pop',
+    'acoustic',
+    'techno',
+    'house',
+    'ambient',
+    'dnb',
+    'garage',
+  ];
   return !legacyIds.includes(id) && GENRE_PROFILES.some((p) => p.id === id);
 }
 

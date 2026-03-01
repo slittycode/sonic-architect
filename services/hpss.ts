@@ -124,9 +124,7 @@ export function separateHarmonicPercussive(
     Math.max(1, Math.floor((totalSamples - FRAME_SIZE) / HOP_SIZE) + 1)
   );
   const actualHop =
-    numFrames >= maxFrames
-      ? Math.floor((totalSamples - FRAME_SIZE) / maxFrames)
-      : HOP_SIZE;
+    numFrames >= maxFrames ? Math.floor((totalSamples - FRAME_SIZE) / maxFrames) : HOP_SIZE;
 
   // --- Build magnitude spectrogram and store phase ---
   const magnitudes: Float32Array[] = [];
@@ -281,10 +279,7 @@ export function separateHarmonicPercussive(
  * Wrap a Float32Array as a minimal AudioBuffer-like object for consumption
  * by detectKey() and detectChords() which expect AudioBuffer.
  */
-export function wrapAsAudioBuffer(
-  data: Float32Array,
-  sampleRate: number
-): AudioBuffer {
+export function wrapAsAudioBuffer(data: Float32Array, sampleRate: number): AudioBuffer {
   return {
     sampleRate,
     numberOfChannels: 1,

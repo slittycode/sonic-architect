@@ -37,7 +37,8 @@
       "Bash(grep:*)",
       "Bash(pnpm list:*)",
       "Bash(pnpm ls:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(awk 'NR>=285 && NR<=450' /Users/christiansmith/code/projects/sonic-architect/services/gemini/geminiProvider.ts)"
     ]
   }
 }

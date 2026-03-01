@@ -23,7 +23,7 @@ export interface SidechainAnalysisResult {
   duckingRatio: number;
 }
 
-const MIN_PUMP_PERIOD_MS = 300;  // ~200 BPM max
+const MIN_PUMP_PERIOD_MS = 300; // ~200 BPM max
 const MAX_PUMP_PERIOD_MS = 1500; // ~40 BPM min
 
 /**
@@ -75,9 +75,7 @@ export function detectSidechainPump(
     const nextPeak = peaks[i + 1];
 
     // Find trough between peaks
-    const troughInRange = troughs.find(
-      (t) => t.index > peak.index && t.index < nextPeak.index
-    );
+    const troughInRange = troughs.find((t) => t.index > peak.index && t.index < nextPeak.index);
 
     if (troughInRange) {
       const duckingRatio = troughInRange.value / peak.value;
@@ -109,8 +107,7 @@ export function detectSidechainPump(
 
   if (periods.length >= 2) {
     const mean = periods.reduce((a, b) => a + b, 0) / periods.length;
-    const variance =
-      periods.reduce((acc, p) => acc + Math.pow(p - mean, 2), 0) / periods.length;
+    const variance = periods.reduce((acc, p) => acc + Math.pow(p - mean, 2), 0) / periods.length;
     const stdDev = Math.sqrt(variance);
     periodConsistency = Math.max(0, 1 - stdDev / mean);
     avgPeriodMs = mean;
@@ -143,10 +140,7 @@ export function detectSidechainPump(
 /**
  * Extract sub-bass envelope using FFT-based filtering.
  */
-function extractSubBassEnvelope(
-  signal: Float32Array,
-  sampleRate: number
-): Float32Array {
+function extractSubBassEnvelope(signal: Float32Array, sampleRate: number): Float32Array {
   // Downsample for efficiency
   const downsampleFactor = Math.floor(sampleRate / 1000); // Target ~1kHz
   const downsampledLength = Math.floor(signal.length / downsampleFactor);

@@ -5,7 +5,12 @@
  * and Meyda. This is the core analysis engine that feeds into the local provider.
  */
 
-import { AudioFeatures, SpectralBandEnergy, SpectralTimeline, SpectralTimelineBand } from '../types';
+import {
+  AudioFeatures,
+  SpectralBandEnergy,
+  SpectralTimeline,
+  SpectralTimelineBand,
+} from '../types';
 import { detectBPM } from './bpmDetection';
 import { detectKey } from './keyDetection';
 import { measureLoudness } from './loudness';

@@ -37,3 +37,4 @@ verification/*.png
 
 # CLI symlink
 node_modules/.bin/sonic
+.pnpm-store
