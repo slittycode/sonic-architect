@@ -112,6 +112,7 @@ export interface AnalysisMeta {
   sampleRate: number;
   duration: number;
   channels: number;
+  llmEnhanced?: boolean;
 }
 
 export interface ChordSegment {

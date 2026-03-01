@@ -302,6 +302,7 @@ export function buildLocalBlueprint(
       sampleRate: features.sampleRate,
       duration: features.duration,
       channels: features.channels,
+      llmEnhanced: false,
     },
     spectralTimeline: features.spectralTimeline,
   };

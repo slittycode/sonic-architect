@@ -23,14 +23,25 @@ const OLLAMA_BASEURL_KEY = 'sonic_ollama_baseurl';
 const OLLAMA_MODEL_KEY = 'sonic_ollama_model';
 const OLLAMA_TEMP_KEY = 'sonic_ollama_temp';
 
+function normalizeBaseUrl(url: string | null): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  // Add http:// if no protocol specified
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return `http://${trimmed}`;
+  }
+  return trimmed;
+}
+
 export function getStoredOllamaConfig(): Partial<OllamaConfig> {
   try {
     const baseUrl = localStorage.getItem(OLLAMA_BASEURL_KEY);
     const model = localStorage.getItem(OLLAMA_MODEL_KEY);
     const temp = localStorage.getItem(OLLAMA_TEMP_KEY);
     return {
-      ...(baseUrl && { baseUrl }),
-      ...(model && { model }),
+      ...(normalizeBaseUrl(baseUrl) && { baseUrl: normalizeBaseUrl(baseUrl) }),
+      ...(model && { model: model.trim() }),
       ...(temp && { temperature: parseFloat(temp) }),
     };
   } catch {
@@ -67,7 +78,20 @@ export async function isModelPulled(
   baseUrl: string = DEFAULT_OLLAMA_CONFIG.baseUrl
 ): Promise<boolean> {
   const models = await listOllamaModels(baseUrl);
-  return models.some((m) => m === modelName || m.startsWith(`${modelName}:`));
+  const found = models.some((m) => {
+    // Match if:
+    // 1. Exact match: "llama3.2:latest" === "llama3.2:latest"
+    // 2. Configured name is prefix of installed: "llama3.2" matches "llama3.2:latest"
+    // 3. Base names match (strip tags): "llama3.2" === "llama3.2"
+    const installedBase = m.split(':')[0];
+    const configBase = modelName.split(':')[0];
+    const match = m === modelName || 
+                  m.startsWith(`${modelName}:`) || 
+                  installedBase === configBase;
+    return match;
+  });
+  console.log(`[Ollama] Checking for model "${modelName}", found: ${found}`);
+  return found;
 }
 
 interface OllamaTagsPayload {
@@ -154,10 +178,16 @@ export async function listOllamaModels(
     const res = await fetch(`${baseUrl}/api/tags`, {
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn('[Ollama] Failed to list models:', res.status, res.statusText);
+      return [];
+    }
     const data = await res.json();
-    return parseModelNames(data);
-  } catch {
+    const models = parseModelNames(data);
+    console.log('[Ollama] Available models:', models);
+    return models;
+  } catch (err) {
+    console.warn('[Ollama] Error listing models:', err);
     return [];
   }
 }

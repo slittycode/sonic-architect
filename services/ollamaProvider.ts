@@ -141,13 +141,22 @@ export class OllamaProvider implements AnalysisProvider {
       ...stored,
       ...config,
     };
+    // Normalize model name (trim whitespace)
+    this.config.model = this.config.model.trim();
+    // Ensure baseUrl has protocol
+    if (this.config.baseUrl && !this.config.baseUrl.startsWith('http')) {
+      this.config.baseUrl = `http://${this.config.baseUrl}`;
+    }
+    console.log('[OllamaProvider] Config:', this.config);
   }
 
   async isAvailable(): Promise<boolean> {
+    console.log('[OllamaProvider] Checking availability at:', this.config.baseUrl);
     return isOllamaAvailable(this.config.baseUrl);
   }
 
   async checkModelPulled(): Promise<boolean> {
+    console.log('[OllamaProvider] Checking if model is pulled:', this.config.model);
     return isModelPulled(this.config.model, this.config.baseUrl);
   }
 
@@ -166,8 +175,16 @@ export class OllamaProvider implements AnalysisProvider {
     const prompt = buildPrompt(localBlueprint);
 
     try {
+      console.log('[OllamaProvider] Querying Ollama...');
       const raw = await queryOllama(prompt, this.config);
       const enhancement = parseEnhancement(raw);
+      const hasEnhancement = enhancement && (
+        enhancement.groove || 
+        (enhancement.instrumentation?.length) || 
+        (enhancement.fxChain?.length) ||
+        enhancement.secretSauce?.trick
+      );
+      console.log('[OllamaProvider] Enhancement applied:', hasEnhancement);
       const merged = mergeEnhancement(localBlueprint, enhancement);
 
       return {
@@ -176,17 +193,20 @@ export class OllamaProvider implements AnalysisProvider {
           ? {
               ...merged.meta,
               provider: 'ollama',
+              llmEnhanced: !!hasEnhancement,
               analysisTime: Math.round(performance.now() - startTime),
             }
           : undefined,
       };
-    } catch {
+    } catch (err) {
+      console.warn('[OllamaProvider] Query failed, using local analysis only:', err);
       return {
         ...localBlueprint,
         meta: localBlueprint.meta
           ? {
               ...localBlueprint.meta,
               provider: 'ollama',
+              llmEnhanced: false,
               analysisTime: Math.round(performance.now() - startTime),
             }
           : undefined,

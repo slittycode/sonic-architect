@@ -387,6 +387,12 @@ export class AzureOpenAIAnalysisProvider implements AnalysisProvider {
 
       const raw = await readSseText(response);
       const enhancement = parseEnhancement(raw);
+      const hasEnhancement = enhancement && (
+        enhancement.groove || 
+        (enhancement.instrumentation?.length) || 
+        (enhancement.fxChain?.length) ||
+        enhancement.secretSauce?.trick
+      );
       const merged = mergeEnhancement(localBlueprint, enhancement);
 
       return {
@@ -395,6 +401,7 @@ export class AzureOpenAIAnalysisProvider implements AnalysisProvider {
           ? {
               ...merged.meta,
               provider: 'azure_openai',
+              llmEnhanced: !!hasEnhancement,
               analysisTime: Math.round(performance.now() - startTime),
             }
           : undefined,
@@ -407,6 +414,7 @@ export class AzureOpenAIAnalysisProvider implements AnalysisProvider {
           ? {
               ...localBlueprint.meta,
               provider: 'azure_openai',
+              llmEnhanced: false,
               analysisTime: Math.round(performance.now() - startTime),
             }
           : undefined,

@@ -290,6 +290,12 @@ export class ClaudeAnalysisProvider implements AnalysisProvider {
 
       const raw = await readSseText(response);
       const enhancement = parseClaudeEnhancement(raw);
+      const hasEnhancement = enhancement && (
+        enhancement.groove || 
+        (enhancement.instrumentation?.length) || 
+        (enhancement.fxChain?.length) ||
+        enhancement.secretSauce?.trick
+      );
       const merged = mergeClaudeEnhancement(localBlueprint, enhancement);
 
       return {
@@ -298,6 +304,7 @@ export class ClaudeAnalysisProvider implements AnalysisProvider {
           ? {
               ...merged.meta,
               provider: 'claude',
+              llmEnhanced: !!hasEnhancement,
               analysisTime: Math.round(performance.now() - startTime),
             }
           : undefined,
@@ -309,6 +316,7 @@ export class ClaudeAnalysisProvider implements AnalysisProvider {
           ? {
               ...localBlueprint.meta,
               provider: 'claude',
+              llmEnhanced: false,
               analysisTime: Math.round(performance.now() - startTime),
             }
           : undefined,

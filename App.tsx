@@ -110,7 +110,7 @@ const App: React.FC = () => {
   });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const objectUrlRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -354,7 +354,9 @@ const App: React.FC = () => {
     setMidiError(null);
     setAlsInfo(null);
     abortRef.current?.abort();
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    // Reset file input by finding and clearing it
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    if (fileInput) fileInput.value = '';
   };
 
   const togglePlayback = useCallback(() => {
@@ -793,22 +795,19 @@ const App: React.FC = () => {
               <span className="hidden sm:inline">Chat</span>
             </button>
 
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={status === AnalysisStatus.ANALYZING}
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-200 text-sm font-medium rounded-md transition-all border border-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
+            <label className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-200 text-sm font-medium rounded-md transition-all border border-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none cursor-pointer"
               aria-label="Import audio stem"
             >
               <Upload className="w-4 h-4" aria-hidden="true" />
               Import Stem
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="audio/*,.als"
-              onChange={handleFileUpload}
-            />
+              <input
+                type="file"
+                className="hidden"
+                accept="audio/*,.als"
+                onChange={handleFileUpload}
+                disabled={status === AnalysisStatus.ANALYZING}
+              />
+            </label>
           </div>
         </div>
       </header>
@@ -1067,13 +1066,17 @@ const App: React.FC = () => {
                         : ' Analysis runs entirely in your browser — no API key needed.'}
               </p>
             </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none"
+            <label className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full transition-all shadow-lg shadow-blue-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus:outline-none cursor-pointer"
               aria-label="Analyze track"
             >
               Analyze Track
-            </button>
+              <input
+                type="file"
+                className="hidden"
+                accept="audio/*,.als"
+                onChange={handleFileUpload}
+              />
+            </label>
           </div>
         )}
       </main>
@@ -1082,7 +1085,14 @@ const App: React.FC = () => {
       <footer className="fixed bottom-0 w-full bg-zinc-950/80 backdrop-blur-sm border-t border-zinc-900 py-3">
         <div className="max-w-[1400px] mx-auto px-6 flex items-center justify-between text-[10px] mono text-zinc-600 uppercase tracking-widest">
           <span>Engine Status: Nominal</span>
-          <span className="hidden sm:inline">Active Engine: {providerLabel}</span>
+          <span className="hidden sm:inline">
+            Active Engine: {providerLabel}
+            {blueprint?.meta?.llmEnhanced !== undefined && (
+              <span className={blueprint.meta.llmEnhanced ? 'text-green-500 ml-2' : 'text-yellow-500 ml-2'}>
+                {blueprint.meta.llmEnhanced ? '● LLM Enhanced' : '● Local Only'}
+              </span>
+            )}
+          </span>
           <span>© 2025 Sonic Architect</span>
         </div>
       </footer>

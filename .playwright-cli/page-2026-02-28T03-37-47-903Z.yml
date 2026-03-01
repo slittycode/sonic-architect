@@ -1,0 +1,38 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e9]:
+          - heading "Sonic Architect" [level=1] [ref=e10]
+          - paragraph [ref=e11]: Sonic Analyzer for Ableton
+      - generic [ref=e12]:
+        - button "Analysis engine settings" [ref=e14]:
+          - img [ref=e15]
+          - generic [ref=e18]: Gemini 2.5 Flash
+        - button "Toggle Claude chat" [ref=e19]:
+          - img [ref=e20]
+          - generic [ref=e23]: Chat
+        - generic "Import audio stem" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+          - text: Import Stem
+  - main [ref=e28]:
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - img [ref=e33]
+          - generic [ref=e36]: Awaiting Input...
+        - button "Start playback" [disabled] [ref=e38]:
+          - img [ref=e39]
+      - generic [ref=e42]: Loading Visualizer...
+    - generic [ref=e43]:
+      - img [ref=e45]
+      - generic [ref=e48]:
+        - heading "Ready to Deconstruct" [level=2] [ref=e49]
+        - paragraph [ref=e50]: Upload an audio file to generate a complete Ableton Live 12 reconstruction blueprint. Local DSP measures BPM, key, and spectrum precisely — Gemini 2.5 Flash enriches descriptions and Ableton device recommendations.
+      - generic "Analyze track" [ref=e51] [cursor=pointer]: Analyze Track
+  - contentinfo [ref=e52]:
+    - generic [ref=e53]:
+      - generic [ref=e54]: "Engine Status: Nominal"
+      - generic [ref=e55]: "Active Engine: Gemini 2.5 Flash"
+      - generic [ref=e56]: © 2025 Sonic Architect
