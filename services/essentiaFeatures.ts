@@ -32,8 +32,9 @@ async function getEssentia() {
     throw new Error('Failed to load Essentia.js modules');
   }
 
-  const wasmModule = await EssentiaWASM(); 
-  essentiaInstance = new Essentia(wasmModule); 
+  const wasmModule =
+    typeof EssentiaWASM === 'function' ? await EssentiaWASM() : EssentiaWASM;
+  essentiaInstance = new Essentia(wasmModule);
   return essentiaInstance;
 }
 
