@@ -4,6 +4,15 @@
 
 # Sonic Architect — Ableton Live 12 Deconstructor
 
+> [!IMPORTANT]
+> This repository is now **historical/read-only** after the split.
+>
+> Active repositories:
+> - App/runtime: `https://github.com/slittycode/sonic-architect-app`
+> - Lab/history/docs/skills: `https://github.com/slittycode/sonic-architect-lab`
+>
+> Migration note: this repository was used as the split source and is retained for traceability.
+
 Upload any audio stem and get a full Ableton Live 12 reconstruction blueprint: BPM, key, arrangement, instrument racks, FX chains, and secret-sauce tips. Includes a **Session Musician** that transcribes audio to MIDI with a piano-roll editor.
 
 ## Features
