@@ -79,9 +79,7 @@ describe('GeminiChatService', () => {
   describe('when VITE_GEMINI_API_KEY is not set', () => {
     it('throws when sendMessage is called', async () => {
       const service = new GeminiChatService();
-      await expect(service.sendMessage('hello')).rejects.toThrow(
-        'Gemini API key not configured'
-      );
+      await expect(service.sendMessage('hello')).rejects.toThrow('Gemini API key not configured');
     });
   });
 

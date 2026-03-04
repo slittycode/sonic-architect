@@ -42,7 +42,13 @@ const validPhase1 = {
     groove: { description: 'Straight mechanical pulse', swingAmount: '0%' },
   },
   arrangement: [
-    { section: 'intro', startTime: 0, endTime: 32, description: 'Sparse drums only', energyLevel: 0.2 },
+    {
+      section: 'intro',
+      startTime: 0,
+      endTime: 32,
+      description: 'Sparse drums only',
+      energyLevel: 0.2,
+    },
     { section: 'drop', startTime: 64, endTime: 128, description: 'Full energy', energyLevel: 0.95 },
   ],
   instrumentation: [
@@ -124,7 +130,9 @@ describe('phase1Schema', () => {
   it('falls back energyLevel to 0.5 when out of range (> 1)', () => {
     const result = phase1Schema.safeParse({
       ...validPhase1,
-      arrangement: [{ section: 'drop', startTime: 64, endTime: 128, description: 'Full', energyLevel: 1.5 }],
+      arrangement: [
+        { section: 'drop', startTime: 64, endTime: 128, description: 'Full', energyLevel: 1.5 },
+      ],
     });
     expect(result.success).toBe(true);
     // Schema uses .catch(0.5) — out-of-range values fall back to the default, not clamped
@@ -134,7 +142,9 @@ describe('phase1Schema', () => {
   it('coerces string startTime/endTime in arrangement sections', () => {
     const result = phase1Schema.safeParse({
       ...validPhase1,
-      arrangement: [{ section: 'drop', startTime: '64', endTime: '128', description: '', energyLevel: 0.9 }],
+      arrangement: [
+        { section: 'drop', startTime: '64', endTime: '128', description: '', energyLevel: 0.9 },
+      ],
     });
     expect(result.success).toBe(true);
     expect(result.data?.arrangement[0].startTime).toBe(64);

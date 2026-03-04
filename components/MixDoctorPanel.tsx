@@ -199,7 +199,9 @@ const MixDoctorPanel: React.FC<MixDoctorPanelProps> = ({ report }) => {
       <div className="px-4 flex items-center justify-between py-3 bg-zinc-800/50 border-b border-zinc-700">
         <div className="flex items-center gap-2">
           <Stethoscope className="w-4 h-4 text-rose-400" aria-hidden="true" />
-          <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Mix Feedback</h3>
+          <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+            Mix Feedback
+          </h3>
           {/* Genre badge */}
           <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-full border border-blue-400/20">
             Comparing to: {report.genre} profile

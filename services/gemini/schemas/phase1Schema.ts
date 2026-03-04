@@ -76,40 +76,48 @@ export const phase1Schema = z.object({
   energy: z.coerce.number().min(0).max(1).catch(0.5),
 
   // Chord Progression
-  chordProgression: z.object({
-    chords: z.array(chordEventSchema).catch([]),
-    summary: z.string().catch(''),
-  }).catch({ chords: [], summary: '' }),
+  chordProgression: z
+    .object({
+      chords: z.array(chordEventSchema).catch([]),
+      summary: z.string().catch(''),
+    })
+    .catch({ chords: [], summary: '' }),
 
   // Sonic Elements
   elements: z.array(sonicElementSchema).catch([]),
 
   // Detected Characteristics
-  detectedCharacteristics: z.object({
-    sidechain: detectedCharacteristicSchema.catch({ present: false, description: '' }),
-    acidResonance: detectedCharacteristicSchema.catch({ present: false, description: '' }),
-    reverbCharacter: detectedCharacteristicSchema.catch({ present: false, description: '' }),
-    distortion: detectedCharacteristicSchema.catch({ present: false, description: '' }),
-    supersawLayers: detectedCharacteristicSchema.catch({ present: false, description: '' }),
-    vocalPresence: detectedCharacteristicSchema.catch({ present: false, description: '' }),
-    bassCharacter: z.object({
-      description: z.string().catch(''),
-      type: z.string().optional(),
-    }).catch({ description: '' }),
-    groove: z.object({
-      swingAmount: z.string().optional(),
-      description: z.string().catch(''),
-    }).catch({ description: '' }),
-  }).catch({
-    sidechain: { present: false, description: '' },
-    acidResonance: { present: false, description: '' },
-    reverbCharacter: { present: false, description: '' },
-    distortion: { present: false, description: '' },
-    supersawLayers: { present: false, description: '' },
-    vocalPresence: { present: false, description: '' },
-    bassCharacter: { description: '' },
-    groove: { description: '' },
-  }),
+  detectedCharacteristics: z
+    .object({
+      sidechain: detectedCharacteristicSchema.catch({ present: false, description: '' }),
+      acidResonance: detectedCharacteristicSchema.catch({ present: false, description: '' }),
+      reverbCharacter: detectedCharacteristicSchema.catch({ present: false, description: '' }),
+      distortion: detectedCharacteristicSchema.catch({ present: false, description: '' }),
+      supersawLayers: detectedCharacteristicSchema.catch({ present: false, description: '' }),
+      vocalPresence: detectedCharacteristicSchema.catch({ present: false, description: '' }),
+      bassCharacter: z
+        .object({
+          description: z.string().catch(''),
+          type: z.string().optional(),
+        })
+        .catch({ description: '' }),
+      groove: z
+        .object({
+          swingAmount: z.string().optional(),
+          description: z.string().catch(''),
+        })
+        .catch({ description: '' }),
+    })
+    .catch({
+      sidechain: { present: false, description: '' },
+      acidResonance: { present: false, description: '' },
+      reverbCharacter: { present: false, description: '' },
+      distortion: { present: false, description: '' },
+      supersawLayers: { present: false, description: '' },
+      vocalPresence: { present: false, description: '' },
+      bassCharacter: { description: '' },
+      groove: { description: '' },
+    }),
 
   // Arrangement
   arrangement: z.array(arrangementSectionSchema).catch([]),
@@ -121,28 +129,32 @@ export const phase1Schema = z.object({
   effectsChain: z.array(effectsChainItemSchema).catch([]),
 
   // Secret Sauce
-  secretSauce: z.object({
-    technique: z.string().catch('Not detected'),
-    description: z.string().catch('Gemini did not return secret sauce analysis.'),
-    abletonImplementation: z.string().catch(''),
-  }).catch({
-    technique: 'Not detected',
-    description: 'Gemini did not return secret sauce analysis.',
-    abletonImplementation: '',
-  }),
+  secretSauce: z
+    .object({
+      technique: z.string().catch('Not detected'),
+      description: z.string().catch('Gemini did not return secret sauce analysis.'),
+      abletonImplementation: z.string().catch(''),
+    })
+    .catch({
+      technique: 'Not detected',
+      description: 'Gemini did not return secret sauce analysis.',
+      abletonImplementation: '',
+    }),
 
   // Genre Analysis
-  genreAnalysis: z.object({
-    primary: z.string().catch('Unknown'),
-    secondary: z.array(z.string()).catch([]),
-    confidence: z.coerce.number().min(0).max(1).catch(0),
-    reasoning: z.string().catch('Not available'),
-  }).catch({
-    primary: 'Unknown',
-    secondary: [],
-    confidence: 0,
-    reasoning: 'Not available',
-  }),
+  genreAnalysis: z
+    .object({
+      primary: z.string().catch('Unknown'),
+      secondary: z.array(z.string()).catch([]),
+      confidence: z.coerce.number().min(0).max(1).catch(0),
+      reasoning: z.string().catch('Not available'),
+    })
+    .catch({
+      primary: 'Unknown',
+      secondary: [],
+      confidence: 0,
+      reasoning: 'Not available',
+    }),
 });
 
 export type GeminiPhase1Response = z.infer<typeof phase1Schema>;

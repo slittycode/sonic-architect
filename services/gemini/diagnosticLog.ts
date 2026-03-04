@@ -76,7 +76,9 @@ export function addDiagnosticEntry(entry: GeminiDiagnosticEntry): void {
   if (!currentReport) return;
   currentReport.phases.push(entry);
 
-  console.log(`[GeminiDiag] ${entry.phase} — ${entry.durationMs}ms, response ${entry.responseLength} chars`);
+  console.log(
+    `[GeminiDiag] ${entry.phase} — ${entry.durationMs}ms, response ${entry.responseLength} chars`
+  );
 }
 
 export function finishAndDownloadReport(totalDurationMs: number): void {

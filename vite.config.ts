@@ -208,8 +208,8 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react(), tailwindcss(), claudeDevProxy(), openaiDevProxy(), azureOpenaiDevProxy()],
     build: {
-      // Keep per-chunk warning threshold generous; @google/genai is legitimately large
-      chunkSizeWarningLimit: 600,
+      // Warning threshold aligned to enforced bundle budget script.
+      chunkSizeWarningLimit: 3000,
       rollupOptions: {
         output: {
           manualChunks: {

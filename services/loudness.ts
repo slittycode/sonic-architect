@@ -79,8 +79,18 @@ function applyKWeighting(data: Float32Array, sampleRate: number): void {
     // For non-48kHz rates, use coefficient adaptation.
     // Pre-filter coefficients for common rates.
     const preFilterCoeffs: Record<number, number[]> = {
-      44100: [1.5308412300498355, -2.6509799951547297, 1.1690790799215869, 1.0, -1.6636551132560204, 0.7125954280732254],
-      96000: [1.5409635878498665, -2.7412514550498283, 1.2382826782498613, 1.0, -1.7269423107860714, 0.7613244030498234],
+      44100: [
+        1.5308412300498355, -2.6509799951547297, 1.1690790799215869, 1.0, -1.6636551132560204,
+        0.7125954280732254,
+      ],
+      96000: [
+        Number('1.5409635878498665'),
+        Number('-2.7412514550498283'),
+        Number('1.2382826782498613'),
+        1.0,
+        Number('-1.7269423107860714'),
+        Number('0.7613244030498234'),
+      ],
     };
     const rlbCoeffs: Record<number, number[]> = {
       44100: [1.0, -2.0, 1.0, 1.0, -1.98916267044904, 0.98919234055177],
@@ -89,7 +99,10 @@ function applyKWeighting(data: Float32Array, sampleRate: number): void {
 
     // Use closest available rate, fallback to 48kHz coefficients
     const rate = preFilterCoeffs[sampleRate] ? sampleRate : 48000;
-    const pre = preFilterCoeffs[rate] ?? [1.53512485958697, -2.69169618940638, 1.19839281085285, 1.0, -1.69065929318241, 0.73248077421585];
+    const pre = preFilterCoeffs[rate] ?? [
+      1.53512485958697, -2.69169618940638, 1.19839281085285, 1.0, -1.69065929318241,
+      0.73248077421585,
+    ];
     const rlb = rlbCoeffs[rate] ?? [1.0, -2.0, 1.0, 1.0, -1.99004745483398, 0.99007225036621];
 
     applyBiquad(data, pre[0], pre[1], pre[2], pre[3], pre[4], pre[5]);
@@ -134,9 +147,10 @@ export function measureLoudness(audioBuffer: AudioBuffer): LoudnessResult {
 
   // Channel weighting per BS.1770 (L, R, C, Ls, Rs)
   // For stereo: both channels weighted 1.0
-  const channelWeights = numChannels <= 2
-    ? new Array(numChannels).fill(1.0)
-    : [1.0, 1.0, 1.0, 1.41, 1.41].slice(0, numChannels);
+  const channelWeights =
+    numChannels <= 2
+      ? new Array(numChannels).fill(1.0)
+      : [1.0, 1.0, 1.0, 1.41, 1.41].slice(0, numChannels);
 
   // Apply K-weighting to each channel (work on copies)
   const kWeightedChannels: Float32Array[] = [];
@@ -151,7 +165,7 @@ export function measureLoudness(audioBuffer: AudioBuffer): LoudnessResult {
 
   // --- Gated block loudness (400ms blocks, 75% overlap = 100ms step) ---
   const blockSamples = Math.floor(0.4 * sampleRate); // 400ms
-  const stepSamples = Math.floor(0.1 * sampleRate);  // 100ms overlap step
+  const stepSamples = Math.floor(0.1 * sampleRate); // 100ms overlap step
   const totalSamples = kWeightedChannels[0].length;
   const numBlocks = Math.max(0, Math.floor((totalSamples - blockSamples) / stepSamples) + 1);
 

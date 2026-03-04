@@ -1,5 +1,17 @@
 import React, { useState } from 'react';
-import { Activity, Clock, Layers, Cpu, Settings2, Zap, Sparkles, Drum, Fingerprint, Music, Stethoscope } from 'lucide-react';
+import {
+  Activity,
+  Clock,
+  Layers,
+  Cpu,
+  Settings2,
+  Zap,
+  Sparkles,
+  Drum,
+  Fingerprint,
+  Music,
+  Stethoscope,
+} from 'lucide-react';
 import { ReconstructionBlueprint } from '../types';
 import MixDoctorPanel from './MixDoctorPanel';
 import SpectralAreaChart from './SpectralAreaChart';
@@ -12,15 +24,30 @@ interface BlueprintDisplayProps {
 
 // --- Chord timeline helpers ---
 const NOTE_ORDER: Record<string, number> = {
-  C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5,
-  'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11,
+  C: 0,
+  'C#': 1,
+  Db: 1,
+  D: 2,
+  'D#': 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  'F#': 6,
+  Gb: 6,
+  G: 7,
+  'G#': 8,
+  Ab: 8,
+  A: 9,
+  'A#': 10,
+  Bb: 10,
+  B: 11,
 };
 function rootNoteIndex(root: string): number {
   return NOTE_ORDER[root] ?? 0;
 }
 function parseSegTime(timeRange: string, side: 'start' | 'end'): number {
   const parts = timeRange.split('–');
-  const s = (side === 'start' ? parts[0] : parts[1] ?? parts[0]).trim();
+  const s = (side === 'start' ? parts[0] : (parts[1] ?? parts[0])).trim();
   const [m, sec] = s.split(':');
   return parseInt(m) * 60 + parseInt(sec ?? '0');
 }
@@ -59,7 +86,12 @@ function renderMarkdown(text: string, textClass = 'text-sm text-indigo-200/80'):
       // Split on inline numbered transitions: "sentence end. 2. next item"
       const subItems = block
         .split(/(?<=[.!?])\s+(?=\d+[.)]\s)/)
-        .map((s) => s.replace(/^\d+[.)]\s*/, '').replace(/\n/g, ' ').trim())
+        .map((s) =>
+          s
+            .replace(/^\d+[.)]\s*/, '')
+            .replace(/\n/g, ' ')
+            .trim()
+        )
         .filter(Boolean);
       if (last?.type === 'ol') {
         last.items.push(...subItems);
@@ -120,7 +152,10 @@ const TelemetryItem: React.FC<{ label: string; value: string }> = ({ label, valu
 const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
   const [spectralMode, setSpectralMode] = useState<'proportional' | 'absolute'>(() => {
     try {
-      return (localStorage.getItem('sonic-spectral-mode') as 'proportional' | 'absolute') ?? 'proportional';
+      return (
+        (localStorage.getItem('sonic-spectral-mode') as 'proportional' | 'absolute') ??
+        'proportional'
+      );
     } catch {
       return 'proportional';
     }
@@ -128,7 +163,9 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
 
   const toggleSpectralMode = (next: 'proportional' | 'absolute') => {
     setSpectralMode(next);
-    try { localStorage.setItem('sonic-spectral-mode', next); } catch { }
+    try {
+      localStorage.setItem('sonic-spectral-mode', next);
+    } catch {}
   };
 
   return (
@@ -178,41 +215,42 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               )}
 
               {/* Beat Tracking */}
-              {blueprint.telemetry.beatPositions && blueprint.telemetry.beatPositions.length > 0 && (
-                <div className="p-3 bg-zinc-950 rounded border border-zinc-800">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Drum className="w-3 h-3 text-cyan-400" />
-                    <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">
-                      Beat Grid
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    <span className="text-zinc-300 mono">
-                      {blueprint.telemetry.beatPositions.length} beats detected
-                    </span>
-                    {blueprint.telemetry.downbeatPosition !== undefined && (
-                      <span className="text-cyan-400/70 mono">
-                        ↓1 @ {blueprint.telemetry.downbeatPosition.toFixed(3)}s
+              {blueprint.telemetry.beatPositions &&
+                blueprint.telemetry.beatPositions.length > 0 && (
+                  <div className="p-3 bg-zinc-950 rounded border border-zinc-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Drum className="w-3 h-3 text-cyan-400" />
+                      <span className="text-[10px] uppercase font-bold text-zinc-600 tracking-wider">
+                        Beat Grid
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-zinc-300 mono">
+                        {blueprint.telemetry.beatPositions.length} beats detected
+                      </span>
+                      {blueprint.telemetry.downbeatPosition !== undefined && (
+                        <span className="text-cyan-400/70 mono">
+                          ↓1 @ {blueprint.telemetry.downbeatPosition.toFixed(3)}s
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex gap-px h-3 overflow-hidden rounded">
+                      {blueprint.telemetry.beatPositions.slice(0, 64).map((beat, i) => {
+                        const isDownbeat = beat === blueprint.telemetry.downbeatPosition;
+                        return (
+                          <div
+                            key={i}
+                            className={`flex-1 min-w-[2px] rounded-sm ${isDownbeat ? 'bg-cyan-400' : i % 4 === 0 ? 'bg-zinc-500' : 'bg-zinc-700'}`}
+                            title={`Beat ${i + 1}: ${beat.toFixed(3)}s`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-zinc-600 mt-1.5">
+                      Use beat positions as Ableton warp markers for sample-accurate alignment.
+                    </p>
                   </div>
-                  <div className="mt-2 flex gap-px h-3 overflow-hidden rounded">
-                    {blueprint.telemetry.beatPositions.slice(0, 64).map((beat, i) => {
-                      const isDownbeat = beat === blueprint.telemetry.downbeatPosition;
-                      return (
-                        <div
-                          key={i}
-                          className={`flex-1 min-w-[2px] rounded-sm ${isDownbeat ? 'bg-cyan-400' : i % 4 === 0 ? 'bg-zinc-500' : 'bg-zinc-700'}`}
-                          title={`Beat ${i + 1}: ${beat.toFixed(3)}s`}
-                        />
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-zinc-600 mt-1.5">
-                    Use beat positions as Ableton warp markers for sample-accurate alignment.
-                  </p>
-                </div>
-              )}
+                )}
 
               {blueprint.telemetry.verificationNotes && (
                 <div className="p-3 bg-zinc-950 rounded border border-zinc-800">
@@ -311,7 +349,8 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
               </div>
               <div className="p-5">
                 <p className="text-[10px] text-zinc-500 mb-3">
-                  13 Mel-Frequency Cepstral Coefficients capturing the timbral character of the audio.
+                  13 Mel-Frequency Cepstral Coefficients capturing the timbral character of the
+                  audio.
                 </p>
                 <div className="flex items-end gap-1 h-16">
                   {blueprint.mfcc.map((coeff, i) => {
@@ -342,8 +381,7 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
                 <div className="mt-3 text-[10px] text-zinc-600 leading-relaxed">
                   {blueprint.mfcc[1] > 0
                     ? 'Positive C1 → brighter, harmonically rich timbre.'
-                    : 'Negative C1 → darker, warmer timbral character.'}
-                  {' '}
+                    : 'Negative C1 → darker, warmer timbral character.'}{' '}
                   {Math.abs(blueprint.mfcc[0]) > 10
                     ? 'High C0 energy — full, loud source material.'
                     : 'Moderate C0 — balanced energy level.'}
@@ -517,10 +555,11 @@ const BlueprintDisplay: React.FC<BlueprintDisplayProps> = ({ blueprint }) => {
                   <button
                     key={m}
                     onClick={() => toggleSpectralMode(m)}
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors ${spectralMode === m
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors ${
+                      spectralMode === m
                         ? 'bg-violet-600/20 border-violet-500 text-violet-400'
                         : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                      }`}
+                    }`}
                   >
                     {m === 'proportional' ? '%' : 'abs'}
                   </button>

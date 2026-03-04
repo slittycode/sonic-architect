@@ -82,7 +82,7 @@ export function buildPhase1Prompt(hints: LocalDSPHints): string {
 
 ## Local DSP Hints
 
-These are approximate measurements from a local DSP engine. Use them as starting points but trust your own ears over these values.
+These are ground-truth measurements from a deterministic DSP engine. Treat all numeric values (BPM, key, LUFS, spectral dB, stereo width) as FIXED FACTS. Do not modify, re-estimate, or second-guess them. Your job is interpretation only: genre, sonic character, groove description, instrument identification, and Ableton signal chains.
 
 \`\`\`json
 ${JSON.stringify(compactHints, null, 2)}

@@ -49,6 +49,7 @@ The app works fully offline with the Local DSP engine. To enable cloud analysis 
 | ----------------------- | -------------------------------------------------------------------- |
 | `pnpm dev`              | Start development server (Vite)                                      |
 | `pnpm build`            | Production build to `dist/`                                          |
+| `pnpm run build:verify` | Build + enforce JS bundle budgets                                    |
 | `pnpm preview`          | Preview the production build locally                                 |
 | `pnpm run typecheck`    | Run TypeScript checks                                                |
 | `pnpm run lint`         | Run ESLint checks                                                    |
@@ -138,3 +139,21 @@ Since `sonic` runs the development server, **no rebuild is needed**:
 ```bash
 pnpm unlink --global
 ```
+
+## Repository Split Workflow
+
+This repo now includes a history-preserving split script and path manifests:
+
+```bash
+scripts/refactor/split-repos.sh /Users/christiansmith/code/projects
+```
+
+Default output repos:
+
+- `/Users/christiansmith/code/projects/sonic-architect-app`
+- `/Users/christiansmith/code/projects/sonic-architect-lab`
+
+Path manifests live at:
+
+- `scripts/refactor/path-manifests/app-paths.txt`
+- `scripts/refactor/path-manifests/lab-paths.txt`

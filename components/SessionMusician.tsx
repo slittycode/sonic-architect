@@ -393,10 +393,11 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
                 <button
                   key={grid}
                   onClick={() => setQuantizeOptions((prev) => ({ ...prev, grid }))}
-                  className={`px-2.5 py-1 text-xs rounded transition-all ${quantizeOptions.grid === grid
+                  className={`px-2.5 py-1 text-xs rounded transition-all ${
+                    quantizeOptions.grid === grid
                       ? 'bg-violet-700/50 text-violet-200 border border-violet-600/50'
                       : 'bg-zinc-800/40 text-zinc-500 border border-zinc-800 hover:text-zinc-300 hover:bg-zinc-800'
-                    }`}
+                  }`}
                 >
                   {gridLabel(grid)}
                 </button>
@@ -433,8 +434,8 @@ const SessionMusician: React.FC<SessionMusicianProps> = ({
             <span>
               {polyMode
                 ? 'Polyphonic detection via Spotify Basic Pitch (TF.js). Handles chords, multi-instrument audio, and complex polyphony. Toggle to Mono for single-instrument stems.'
-                : 'Monophonic pitch detection via YIN autocorrelation. Best results with clean, single-instrument stems. Toggle to Poly for chords and multi-note content.'}
-              {' '}Adjust quantization to snap notes to the rhythmic grid before downloading.
+                : 'Monophonic pitch detection via YIN autocorrelation. Best results with clean, single-instrument stems. Toggle to Poly for chords and multi-note content.'}{' '}
+              Adjust quantization to snap notes to the rhythmic grid before downloading.
             </span>
           </div>
         </>

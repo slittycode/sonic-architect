@@ -15,9 +15,10 @@ const instrumentationItemSchema = z.object({
   type: z.string().catch('synth'),
   description: z.string().catch(''),
   abletonDevice: z.string().catch(''),
-  deviceChain: z.union([z.array(z.string()), z.string()]).transform((v) =>
-    typeof v === 'string' ? v : v.join(' → ')
-  ).catch(''),
+  deviceChain: z
+    .union([z.array(z.string()), z.string()])
+    .transform((v) => (typeof v === 'string' ? v : v.join(' → ')))
+    .catch(''),
   presetSuggestion: z.string().catch(''),
   parameterNotes: z.string().catch(''),
 });
@@ -105,17 +106,23 @@ export const phase2Schema = z.object({
 
   // BPM / key corrections (only if Gemini is >50% confident the DSP value is wrong)
   // .nullable() because models often return null when no correction is needed
-  bpmCorrection: z.object({
-    correctedBpm: z.coerce.number().positive().optional(),
-    confidence: z.coerce.number().min(0).max(1).catch(0),
-    reasoning: z.string().catch(''),
-  }).nullable().optional(),
+  bpmCorrection: z
+    .object({
+      correctedBpm: z.coerce.number().positive().optional(),
+      confidence: z.coerce.number().min(0).max(1).catch(0),
+      reasoning: z.string().catch(''),
+    })
+    .nullable()
+    .optional(),
 
-  keyCorrection: z.object({
-    correctedKey: z.string().optional(),
-    confidence: z.coerce.number().min(0).max(1).catch(0),
-    reasoning: z.string().catch(''),
-  }).nullable().optional(),
+  keyCorrection: z
+    .object({
+      correctedKey: z.string().optional(),
+      confidence: z.coerce.number().min(0).max(1).catch(0),
+      reasoning: z.string().catch(''),
+    })
+    .nullable()
+    .optional(),
 });
 
 export type GeminiPhase2Additions = z.infer<typeof phase2Schema>;

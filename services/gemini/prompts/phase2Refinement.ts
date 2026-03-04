@@ -42,7 +42,10 @@ export function buildPhase2Prompt(phase1: GeminiPhase1Response, hints: LocalDSPH
 
   // Build a compact element list from Phase 1 for the prompt
   const elementSummary = (phase1.elements || [])
-    .map((e, i) => `${i + 1}. ${e.name} (${e.role || 'unknown role'}) — ${e.sonicCharacter || e.frequencyRange || ''}`)
+    .map(
+      (e, i) =>
+        `${i + 1}. ${e.name} (${e.role || 'unknown role'}) — ${e.sonicCharacter || e.frequencyRange || ''}`
+    )
     .join('\n');
 
   return `${SYSTEM_PREAMBLE}

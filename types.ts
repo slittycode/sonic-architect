@@ -1,3 +1,13 @@
+/**
+ * Transitional compatibility barrel.
+ *
+ * Domain-scoped type entry points now exist under:
+ * - src/domain/providers/types.ts
+ * - src/domain/audio/types.ts
+ * - src/domain/blueprint/types.ts
+ *
+ * Keep this file while legacy imports are migrated.
+ */
 export interface GlobalTelemetry {
   bpm: string;
   key: string;

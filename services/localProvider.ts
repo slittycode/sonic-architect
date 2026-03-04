@@ -23,10 +23,7 @@ import { generateVitalPatch, generateOperatorPatch } from './patchSmith';
 import { generateMixReport } from './mixDoctor';
 import { detectChords, ChordProgressionResult } from './chordDetection';
 import { classifyGenre } from './genreClassifier';
-import {
-  classifyGenreEnhanced,
-  EnhancedGenreClassification,
-} from './genreClassifierEnhanced';
+import { classifyGenreEnhanced, EnhancedGenreClassification } from './genreClassifierEnhanced';
 import { separateHarmonicPercussive, wrapAsAudioBuffer } from './hpss';
 import { extractEssentiaFeatures } from './essentiaFeatures';
 import { detectPolyphonic } from './polyphonicPitch';
@@ -261,10 +258,10 @@ export function buildLocalBlueprint(
         sidechainAnalysis: enhancedGenreResult.sidechainAnalysis || undefined,
         bassAnalysis: enhancedGenreResult.bassAnalysis
           ? {
-            decayMs: enhancedGenreResult.bassAnalysis.averageDecayMs,
-            type: enhancedGenreResult.bassAnalysis.type,
-            transientRatio: enhancedGenreResult.bassAnalysis.transientRatio,
-          }
+              decayMs: enhancedGenreResult.bassAnalysis.averageDecayMs,
+              type: enhancedGenreResult.bassAnalysis.type,
+              transientRatio: enhancedGenreResult.bassAnalysis.transientRatio,
+            }
           : undefined,
         swingAnalysis: enhancedGenreResult.swingAnalysis || undefined,
         acidAnalysis: enhancedGenreResult.acidAnalysis || undefined,
@@ -280,21 +277,21 @@ export function buildLocalBlueprint(
       fxChain.length > 0
         ? fxChain
         : [
-          {
-            artifact: 'Balanced dynamics and spectrum',
-            recommendation:
-              'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
-          },
-        ],
+            {
+              artifact: 'Balanced dynamics and spectrum',
+              recommendation:
+                'No major issues detected. Consider light mastering chain: EQ Eight (gentle cuts), Glue Compressor (2:1, gentle), Limiter (-0.3dB ceiling).',
+            },
+          ],
     secretSauce,
     patches,
     mixReport,
     mfcc: features.mfcc,
     ...(chordResult && chordResult.chords.length > 0
       ? {
-        chordProgression: chordResult.chords,
-        chordProgressionSummary: chordResult.progression,
-      }
+          chordProgression: chordResult.chords,
+          chordProgressionSummary: chordResult.progression,
+        }
       : {}),
     meta: {
       provider,
@@ -340,7 +337,10 @@ export class LocalAnalysisProvider implements AnalysisProvider {
 
     // Essentia.js WASM features (lazy-loaded, non-blocking on failure)
     const essentiaFeatures = await extractEssentiaFeatures(audioBuffer).catch((err) => {
-      console.warn('[LocalProvider] Essentia.js WASM unavailable — skipping advanced features:', err);
+      console.warn(
+        '[LocalProvider] Essentia.js WASM unavailable — skipping advanced features:',
+        err
+      );
       return null;
     });
     if (essentiaFeatures) {
@@ -370,7 +370,10 @@ export class LocalAnalysisProvider implements AnalysisProvider {
     const polyphonicNotes = await detectPolyphonic(audioBuffer, features.bpm)
       .then((r) => r.notes)
       .catch((err) => {
-        console.warn('[LocalProvider] Basic Pitch (TF.js) unavailable — supersaw detection disabled:', err);
+        console.warn(
+          '[LocalProvider] Basic Pitch (TF.js) unavailable — supersaw detection disabled:',
+          err
+        );
         return [];
       });
     signal?.throwIfAborted();

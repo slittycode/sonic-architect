@@ -1,0 +1,8 @@
+skills
+archive
+plans
+AGENT_IDEAS.md
+INTEGRATION_SUMMARY.md
+NEXT_PHASE.md
+REVIEW_AND_IMPROVEMENTS.md
+debug-ollama-analysis.png

@@ -45,7 +45,7 @@ function openChrome(url) {
           args = [url];
           return;
         });
-      } catch (e) {
+      } catch {
         // Try next path
       }
     }
